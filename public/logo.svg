@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E85D04"/>
+      <stop offset="100%" stop-color="#ffa040"/>
+    </linearGradient>
+    <filter id="spray" x="-6%" y="-6%" width="112%" height="112%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- vinyl O -->
+  <g filter="url(#spray)">
+    <circle cx="42" cy="52" r="33" fill="none" stroke="url(#g)" stroke-width="7"/>
+    <circle cx="42" cy="52" r="10" fill="url(#g)"/>
+  </g>
+
+  <!-- m'pu text -->
+  <text x="84" y="82" font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="82" fill="url(#g)" filter="url(#spray)">m'pu</text>
+
+  <!-- overspray -->
+  <g fill="url(#g)" opacity="0.4" filter="url(#spray)">
+    <circle cx="18" cy="36" r="2"/>
+    <circle cx="56" cy="82" r="2.5"/>
+    <circle cx="78" cy="28" r="1.5"/>
+    <circle cx="160" cy="90" r="2"/>
+    <circle cx="220" cy="32" r="2.5"/>
+    <circle cx="260" cy="76" r="2"/>
+    <circle cx="32" cy="86" r="1.5"/>
+    <circle cx="100" cy="88" r="1.8"/>
+    <circle cx="180" cy="24" r="1.5"/>
+    <circle cx="250" cy="60" r="1.8"/>
+    <circle cx="68" cy="20" r="1"/>
+    <circle cx="200" cy="86" r="1.2"/>
+  </g>
+</svg>

@@ -1,0 +1,114 @@
+[
+  {
+    "id": 1,
+    "name": "DJ Solstice",
+    "genre": "Deep House",
+    "date": "2026-06-20",
+    "time": "22:00",
+    "bio": "Berlin-trained selector. Hypnotic grooves and warm basslines."
+  },
+  {
+    "id": 2,
+    "name": "MIRA",
+    "genre": "Afrobeat / Disco",
+    "date": "2026-06-21",
+    "time": "21:00",
+    "bio": "Vinyl-only sets. Rare grooves from Lagos to New York."
+  },
+  {
+    "id": 3,
+    "name": "Kael",
+    "genre": "Minimal Techno",
+    "date": "2026-06-27",
+    "time": "23:00",
+    "bio": "Resident. Dark, stripped-back, precise."
+  },
+  {
+    "id": 4,
+    "name": "Rosa Luz",
+    "genre": "Latin Electronic",
+    "date": "2026-06-28",
+    "time": "21:30",
+    "bio": "Cumbia meets drum machines. Irresistible energy."
+  },
+  {
+    "id": 5,
+    "name": "Oskar",
+    "genre": "Dub Techno",
+    "date": "2026-06-29",
+    "time": "22:00",
+    "bio": "Soundsystem specialist. Weight and space."
+  },
+  {
+    "id": 6,
+    "name": "Nina Blaze",
+    "genre": "Funk / Soul",
+    "date": "2026-07-04",
+    "time": "21:00",
+    "bio": "45s only. Sweaty, joyful, raw."
+  },
+  {
+    "id": 7,
+    "name": "DJ Solstice",
+    "genre": "Deep House",
+    "date": "2026-07-05",
+    "time": "22:00",
+    "bio": "Berlin-trained selector. Hypnotic grooves and warm basslines."
+  },
+  {
+    "id": 8,
+    "name": "El Cid",
+    "genre": "Cumbia / Psychedelic",
+    "date": "2026-07-11",
+    "time": "21:30",
+    "bio": "Tropicalia from the crates. Pure sunshine."
+  },
+  {
+    "id": 9,
+    "name": "Kael",
+    "genre": "Minimal Techno",
+    "date": "2026-07-12",
+    "time": "23:00",
+    "bio": "Resident. Dark, stripped-back, precise."
+  },
+  {
+    "id": 10,
+    "name": "Syrup",
+    "genre": "Ambient / Experimental",
+    "date": "2026-07-18",
+    "time": "20:00",
+    "bio": "Early set. Textures and drift."
+  },
+  {
+    "id": 11,
+    "name": "DJ Solstice",
+    "genre": "Deep House",
+    "date": "2026-06-13",
+    "time": "22:00",
+    "bio": "Berlin-trained selector. Hypnotic grooves and warm basslines."
+  },
+  {
+    "id": 12,
+    "name": "MIRA",
+    "genre": "Afrobeat / Disco",
+    "date": "2026-06-14",
+    "time": "21:00",
+    "bio": "Vinyl-only sets. Rare grooves from Lagos to New York."
+  },
+  {
+    "id": 13,
+    "name": "Rosa Luz",
+    "genre": "Latin Electronic",
+    "date": "2026-06-07",
+    "time": "21:30",
+    "bio": "Cumbia meets drum machines. Irresistible energy."
+  },
+  {
+    "id": 14,
+    "name": "Nina Blaze",
+    "genre": "Funk / Soul",
+    "date": "2026-06-06",
+    "time": "21:00",
+    "bio": "45s only. Sweaty, joyful, raw."
+  }
+]

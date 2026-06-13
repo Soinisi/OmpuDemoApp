@@ -1,0 +1,14 @@
+{
+  "name": "ompu-bar",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^2.1.1"
+  }
+}

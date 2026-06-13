@@ -1,0 +1,128 @@
+[
+  {
+    "id": 1,
+    "name": "Ompu Old Fashioned",
+    "category": "cocktails",
+    "description": "Bourbon, bitters, orange twist, smoked",
+    "price": 14
+  },
+  {
+    "id": 2,
+    "name": "Black Margarita",
+    "category": "cocktails",
+    "description": "Tequila, activated charcoal, lime, agave",
+    "price": 13
+  },
+  {
+    "id": 3,
+    "name": "Ember Sour",
+    "category": "cocktails",
+    "description": "Whiskey, lemon, honey, cinnamon",
+    "price": 12
+  },
+  {
+    "id": 4,
+    "name": "Smoked Negroni",
+    "category": "cocktails",
+    "description": "Gin, Campari, vermouth, smoked glass",
+    "price": 14
+  },
+  {
+    "id": 5,
+    "name": "Mezcal Mule",
+    "category": "cocktails",
+    "description": "Mezcal, ginger, lime, chili salt",
+    "price": 12
+  },
+  {
+    "id": 6,
+    "name": "Paper Plane",
+    "category": "cocktails",
+    "description": "Bourbon, Aperol, Amaro, lemon",
+    "price": 13
+  },
+  {
+    "id": 7,
+    "name": "Dark & Stormy",
+    "category": "cocktails",
+    "description": "Dark rum, ginger beer, lime",
+    "price": 11
+  },
+  {
+    "id": 8,
+    "name": "Espresso Martini",
+    "category": "cocktails",
+    "description": "Vodka, fresh espresso, coffee liqueur",
+    "price": 13
+  },
+  {
+    "id": 9,
+    "name": "Draft IPA",
+    "category": "beer",
+    "description": "Local craft, rotating taps",
+    "price": 8
+  },
+  {
+    "id": 10,
+    "name": "Dark Lager",
+    "category": "beer",
+    "description": "Rich malt, smooth finish",
+    "price": 7
+  },
+  {
+    "id": 11,
+    "name": "Saison",
+    "category": "beer",
+    "description": "Farmhouse ale, dry, peppery",
+    "price": 8
+  },
+  {
+    "id": 12,
+    "name": "Porter",
+    "category": "beer",
+    "description": "Rich roasted malt, chocolate, smooth",
+    "price": 9
+  },
+  {
+    "id": 13,
+    "name": "Pale Ale",
+    "category": "beer",
+    "description": "Citrusy, crisp, sessionable",
+    "price": 7
+  },
+  {
+    "id": 14,
+    "name": "Natural Wine",
+    "category": "wine",
+    "description": "Skin-contact orange, funky",
+    "price": 11
+  },
+  {
+    "id": 15,
+    "name": "House Red",
+    "category": "wine",
+    "description": "Tempranillo, bold and warm",
+    "price": 9
+  },
+  {
+    "id": 16,
+    "name": "Orange Wine",
+    "category": "wine",
+    "description": "Extended skin contact, tannic, wild",
+    "price": 10
+  },
+  {
+    "id": 17,
+    "name": "Pet Nat",
+    "category": "wine",
+    "description": "Bubbly, unfiltered, bottle-conditioned",
+    "price": 12
+  },
+  {
+    "id": 18,
+    "name": "House White",
+    "category": "wine",
+    "description": "Albariño, saline, bright",
+    "price": 8
+  }
+]
