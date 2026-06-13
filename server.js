@@ -114,8 +114,8 @@ app.get("/", (_req, res) => {
     layout(
       "Home",
       `
-${site.hero_image ? `<div class="hero-bg"><img src="/images/${site.hero_image}" class="hero-bg-img"></div>` : ""}
 <div class="hero">
+  ${site.hero_image ? `<div class="hero-bg"><img src="/images/${site.hero_image}" class="hero-bg-img"></div>` : ""}
   <img src="/logo.svg" alt="ompu" class="hero-logo">
   <p class="hero-tagline">Drinks. Music. After dark.</p>
   <div class="hero-hours">
