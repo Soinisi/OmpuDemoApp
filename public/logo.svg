@@ -1,37 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="120 100 1560 420">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#E85D04"/>
-      <stop offset="100%" stop-color="#ffa040"/>
-    </linearGradient>
-    <filter id="spray" x="-6%" y="-6%" width="112%" height="112%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="4" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
+    <mask id="logo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1792" height="768">
+      <g fill="white">
+        <circle cx="315" cy="315" r="177"/>
+        <path d="M500 126H654L676 249L701 126H850V492H712V392L676 480L637 392V492H500Z"/>
+        <path d="M880 126H916V169C916 202 901 218 879 218V187C890 187 895 178 895 163H880Z"/>
+        <path d="M942 126H1178C1240 126 1288 166 1288 230C1288 291 1240 328 1178 328H1101C1086 328 1073 340 1073 355V492H942Z"/>
+        <path d="M1294 126H1453V300C1453 319 1460 329 1474 329C1488 329 1495 319 1495 300V126H1648V300C1648 411 1579 477 1474 477C1368 477 1294 411 1294 300Z"/>
+      </g>
+
+      <g fill="black">
+        <circle cx="315" cy="315" r="58"/>
+
+        <rect x="190" y="127" width="128" height="9" rx="5"/>
+        <rect x="173" y="153" width="145" height="9" rx="5"/>
+        <rect x="161" y="179" width="157" height="9" rx="5"/>
+        <rect x="151" y="205" width="167" height="9" rx="5"/>
+        <rect x="141" y="231" width="177" height="9" rx="5"/>
+
+        <rect x="500" y="130" width="143" height="9" rx="5"/>
+        <rect x="500" y="158" width="150" height="9" rx="5"/>
+        <rect x="500" y="186" width="158" height="9" rx="5"/>
+        <rect x="500" y="214" width="166" height="9" rx="5"/>
+
+        <rect x="942" y="132" width="318" height="9" rx="5"/>
+        <rect x="942" y="158" width="338" height="9" rx="5"/>
+        <rect x="942" y="185" width="346" height="9" rx="5"/>
+        <rect x="942" y="212" width="352" height="9" rx="5"/>
+
+        <rect x="1294" y="132" width="160" height="9" rx="5"/>
+        <rect x="1294" y="158" width="160" height="9" rx="5"/>
+        <rect x="1294" y="185" width="160" height="9" rx="5"/>
+        <rect x="1294" y="212" width="160" height="9" rx="5"/>
+      </g>
+    </mask>
   </defs>
 
-  <!-- vinyl O -->
-  <g filter="url(#spray)">
-    <circle cx="42" cy="52" r="33" fill="none" stroke="url(#g)" stroke-width="7"/>
-    <circle cx="42" cy="52" r="10" fill="url(#g)"/>
-  </g>
-
-  <!-- m'pu text -->
-  <text x="84" y="82" font-family="Impact,'Arial Black',sans-serif" font-weight="900" font-size="82" fill="url(#g)" filter="url(#spray)">m'pu</text>
-
-  <!-- overspray -->
-  <g fill="url(#g)" opacity="0.4" filter="url(#spray)">
-    <circle cx="18" cy="36" r="2"/>
-    <circle cx="56" cy="82" r="2.5"/>
-    <circle cx="78" cy="28" r="1.5"/>
-    <circle cx="160" cy="90" r="2"/>
-    <circle cx="220" cy="32" r="2.5"/>
-    <circle cx="260" cy="76" r="2"/>
-    <circle cx="32" cy="86" r="1.5"/>
-    <circle cx="100" cy="88" r="1.8"/>
-    <circle cx="180" cy="24" r="1.5"/>
-    <circle cx="250" cy="60" r="1.8"/>
-    <circle cx="68" cy="20" r="1"/>
-    <circle cx="200" cy="86" r="1.2"/>
-  </g>
+  <rect width="1792" height="768" fill="#E85D04" mask="url(#logo-mask)"/>
 </svg>
