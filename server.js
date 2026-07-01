@@ -1,64 +1,152 @@
 const express = require("express");
-const session = require("express-session");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+const { getStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PW = process.env.ADMIN_PASSWORD || "admin";
+const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
+const ADMIN_COOKIE = "ompu_admin";
+const ROOT_DIR = __dirname;
+const USE_BLOBS = process.env.NETLIFY === "true" || process.env.USE_NETLIFY_BLOBS === "true";
+
+function uploadName(file) {
+  return Date.now() + "-" + path.basename(file.originalname).replace(/\s+/g, "-");
+}
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: "public/images/",
-    filename: (_req, file, cb) => {
-      cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "-"));
-    },
-  }),
+  storage: USE_BLOBS
+    ? multer.memoryStorage()
+    : multer.diskStorage({
+        destination: path.join(ROOT_DIR, "public/images"),
+        filename: (_req, file, cb) => cb(null, uploadName(file)),
+      }),
 });
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(express.static("public"));
-app.use(
-  session({
-    secret: "ompu-bar-secret-" + (ADMIN_PW || "fallback"),
-    resave: false,
-    saveUninitialized: false,
-  })
-);
+
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
 
 // --- Data helpers ---
 
+function dataPath(name) {
+  return path.join(ROOT_DIR, "data", `${name}.json`);
+}
+
+function readLocalData(name) {
+  return JSON.parse(fs.readFileSync(dataPath(name), "utf-8"));
+}
+
+async function loadData(name) {
+  if (!USE_BLOBS) return readLocalData(name);
+
+  const store = getStore("ompu-data");
+  const key = `${name}.json`;
+  const data = await store.get(key, { type: "json" });
+  if (data !== null) return data;
+
+  const seed = readLocalData(name);
+  await store.setJSON(key, seed);
+  return seed;
+}
+
+async function saveData(name, data) {
+  if (USE_BLOBS) {
+    await getStore("ompu-data").setJSON(`${name}.json`, data);
+    return;
+  }
+
+  fs.writeFileSync(dataPath(name), JSON.stringify(data, null, 2));
+}
+
 function loadDrinks() {
-  return JSON.parse(fs.readFileSync("data/drinks.json", "utf-8"));
+  return loadData("drinks");
 }
 function saveDrinks(data) {
-  fs.writeFileSync("data/drinks.json", JSON.stringify(data, null, 2));
+  return saveData("drinks", data);
 }
 function loadDJs() {
-  return JSON.parse(fs.readFileSync("data/djs.json", "utf-8"));
+  return loadData("djs");
 }
 function saveDJs(data) {
-  fs.writeFileSync("data/djs.json", JSON.stringify(data, null, 2));
+  return saveData("djs", data);
 }
 function loadSite() {
-  return JSON.parse(fs.readFileSync("data/site.json", "utf-8"));
+  return loadData("site");
 }
 function saveSite(data) {
-  fs.writeFileSync("data/site.json", JSON.stringify(data, null, 2));
+  return saveData("site", data);
 }
-function removeImage(filename) {
+async function saveUploadedImage(file) {
+  if (!file) return "";
+  if (!USE_BLOBS) return file.filename;
+
+  const filename = uploadName(file);
+  const body = file.buffer.buffer.slice(file.buffer.byteOffset, file.buffer.byteOffset + file.buffer.byteLength);
+  await getStore("ompu-images").set(filename, body, {
+    metadata: { contentType: file.mimetype },
+  });
+  return filename;
+}
+async function removeImage(filename) {
   if (!filename) return;
-  const p = path.join("public/images", filename);
+  if (USE_BLOBS) {
+    await getStore("ompu-images").delete(filename);
+    return;
+  }
+
+  const p = path.join(ROOT_DIR, "public/images", filename);
   if (fs.existsSync(p)) fs.unlinkSync(p);
 }
+
+app.get("/images/:filename", asyncHandler(async (req, res) => {
+  if (USE_BLOBS) {
+    const blob = await getStore("ompu-images").getWithMetadata(req.params.filename, { type: "arrayBuffer" });
+    if (blob) {
+      res.type((blob.metadata && blob.metadata.contentType) || path.extname(req.params.filename));
+      return res.send(Buffer.from(blob.data));
+    }
+  }
+
+  const imagePath = path.join(ROOT_DIR, "public/images", req.params.filename);
+  if (!fs.existsSync(imagePath)) return res.status(404).send("Not found");
+  res.sendFile(imagePath);
+}));
+
+app.use(express.static(path.join(ROOT_DIR, "public")));
 
 // --- Auth middleware ---
 
 function requireAdmin(req, res, next) {
-  if (req.session.isAdmin) return next();
+  if (isAdmin(req)) return next();
   res.redirect("/admin");
+}
+
+function getCookie(req, name) {
+  const cookie = req.headers.cookie || "";
+  const parts = cookie.split(";").map((part) => part.trim());
+  const found = parts.find((part) => part.startsWith(name + "="));
+  return found ? decodeURIComponent(found.slice(name.length + 1)) : "";
+}
+
+function sign(value) {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
+}
+
+function isAdmin(req) {
+  const value = getCookie(req, ADMIN_COOKIE);
+  const [payload, signature] = value.split(".");
+  if (payload !== "1" || !signature) return false;
+
+  const expected = sign(payload);
+  if (signature.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
 // --- Layout ---
@@ -108,8 +196,8 @@ function indent(str, n) {
 // PUBLIC PAGES
 // ============================================================
 
-app.get("/", (_req, res) => {
-  const site = loadSite();
+app.get("/", asyncHandler(async (_req, res) => {
+  const site = await loadSite();
   res.send(
     layout(
       "Home",
@@ -204,10 +292,10 @@ app.get("/", (_req, res) => {
 </section>`
     )
   );
-});
+}));
 
-app.get("/drinks", (req, res) => {
-  const drinks = loadDrinks();
+app.get("/drinks", asyncHandler(async (req, res) => {
+  const drinks = await loadDrinks();
   const categories = [...new Set(drinks.map((d) => d.category))];
   const selectedCat = req.query.cat || categories[0];
 
@@ -244,7 +332,7 @@ app.get("/drinks", (req, res) => {
 </div>`
     )
   );
-});
+}));
 
 function drinkCards(drinks) {
   return drinks
@@ -260,8 +348,8 @@ function drinkCards(drinks) {
     .join("\n");
 }
 
-app.get("/djs", (_req, res) => {
-  const djs = loadDJs();
+app.get("/djs", asyncHandler(async (_req, res) => {
+  const djs = await loadDJs();
   const now = new Date();
   const upcoming = djs
     .filter((d) => new Date(d.date) >= now)
@@ -301,7 +389,7 @@ ${
 }`
     )
   );
-});
+}));
 
 function djRow(d) {
   const date = new Date(d.date);
@@ -376,21 +464,26 @@ app.get("/admin", (_req, res) => {
 
 app.post("/admin/login", (req, res) => {
   if (req.body.password === ADMIN_PW) {
-    req.session.isAdmin = true;
+    res.cookie(ADMIN_COOKIE, `1.${sign("1")}`, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NETLIFY === "true",
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+    });
     return res.redirect("/admin/drinks");
   }
   res.send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">Wrong password.</p>`);
 });
 
 app.post("/admin/logout", (req, res) => {
-  req.session.destroy();
+  res.clearCookie(ADMIN_COOKIE);
   res.redirect("/admin");
 });
 
 // --- Site settings ---
 
-app.get("/admin/site", requireAdmin, (_req, res) => {
-  const site = loadSite();
+app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
+  const site = await loadSite();
   res.send(
     adminLayout(
       "Admin — Site",
@@ -410,30 +503,30 @@ app.get("/admin/site", requireAdmin, (_req, res) => {
 </div>`
     )
   );
-});
+}));
 
-app.post("/admin/site", requireAdmin, upload.single("image"), (req, res) => {
-  const site = loadSite();
+app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+  const site = await loadSite();
   if (req.file) {
-    removeImage(site.hero_image);
-    site.hero_image = req.file.filename;
-    saveSite(site);
+    await removeImage(site.hero_image);
+    site.hero_image = await saveUploadedImage(req.file);
+    await saveSite(site);
   }
   res.redirect("/admin/site");
-});
+}));
 
-app.post("/admin/site/remove-hero", requireAdmin, (req, res) => {
-  const site = loadSite();
-  removeImage(site.hero_image);
+app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) => {
+  const site = await loadSite();
+  await removeImage(site.hero_image);
   site.hero_image = "";
-  saveSite(site);
+  await saveSite(site);
   res.redirect("/admin/site");
-});
+}));
 
 // --- Drink CRUD ---
 
-app.get("/admin/drinks", requireAdmin, (_req, res) => {
-  const drinks = loadDrinks();
+app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
+  const drinks = await loadDrinks();
   res.send(
     adminLayout(
       "Admin — Drinks",
@@ -461,40 +554,41 @@ app.get("/admin/drinks", requireAdmin, (_req, res) => {
 </div>`
     )
   );
-});
+}));
 
-app.post("/admin/drinks", requireAdmin, upload.single("image"), (req, res) => {
-  const drinks = loadDrinks();
+app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+  const drinks = await loadDrinks();
   const { id, name, category, description, price } = req.body;
 
   const existing = +id > 0 ? drinks.find((d) => d.id === +id) : null;
 
   if (existing) {
     if (req.file) {
-      removeImage(existing.image);
-      existing.image = req.file.filename;
+      await removeImage(existing.image);
+      existing.image = await saveUploadedImage(req.file);
     }
     Object.assign(existing, { name, category, description, price: +price });
   } else {
     const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
+    const image = await saveUploadedImage(req.file);
     drinks.push({
       id: newId, name, category, description, price: +price,
-      image: req.file ? req.file.filename : "",
+      image,
     });
   }
 
-  saveDrinks(drinks);
+  await saveDrinks(drinks);
   res.send(adminDrinkList(drinks));
-});
+}));
 
-app.delete("/admin/drinks/:id", requireAdmin, (req, res) => {
-  let drinks = loadDrinks();
+app.delete("/admin/drinks/:id", requireAdmin, asyncHandler(async (req, res) => {
+  let drinks = await loadDrinks();
   const drink = drinks.find((d) => d.id === +req.params.id);
-  if (drink) removeImage(drink.image);
+  if (drink) await removeImage(drink.image);
   drinks = drinks.filter((d) => d.id !== +req.params.id);
-  saveDrinks(drinks);
+  await saveDrinks(drinks);
   res.send(adminDrinkList(drinks));
-});
+}));
 
 function adminDrinkList(drinks) {
   return drinks
@@ -524,8 +618,8 @@ function adminDrinkList(drinks) {
     .join("\n");
 }
 
-app.get("/admin/drinks/edit/:id", requireAdmin, (req, res) => {
-  const drinks = loadDrinks();
+app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const drinks = await loadDrinks();
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
   res.send(`
@@ -551,10 +645,10 @@ app.get("/admin/drinks/edit/:id", requireAdmin, (req, res) => {
       hx-swap="outerHTML">Cancel</button>
   </form>
 </div>`);
-});
+}));
 
-app.get("/admin/drinks/cancel/:id", requireAdmin, (req, res) => {
-  const drinks = loadDrinks();
+app.get("/admin/drinks/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const drinks = await loadDrinks();
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
   res.send(`
@@ -578,12 +672,12 @@ app.get("/admin/drinks/cancel/:id", requireAdmin, (req, res) => {
       hx-confirm="Delete ${d.name}?">Delete</button>
   </div>
 </div>`);
-});
+}));
 
 // --- DJ CRUD ---
 
-app.get("/admin/djs", requireAdmin, (_req, res) => {
-  const djs = loadDJs().sort((a, b) => new Date(b.date) - new Date(a.date));
+app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
+  const djs = (await loadDJs()).sort((a, b) => new Date(b.date) - new Date(a.date));
   res.send(
     adminLayout(
       "Admin — DJs",
@@ -608,40 +702,41 @@ app.get("/admin/djs", requireAdmin, (_req, res) => {
 </div>`
     )
   );
-});
+}));
 
-app.post("/admin/djs", requireAdmin, upload.single("image"), (req, res) => {
-  const djs = loadDJs();
+app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+  const djs = await loadDJs();
   const { id, name, genre, date, time, bio } = req.body;
 
   const existing = +id > 0 ? djs.find((d) => d.id === +id) : null;
 
   if (existing) {
     if (req.file) {
-      removeImage(existing.image);
-      existing.image = req.file.filename;
+      await removeImage(existing.image);
+      existing.image = await saveUploadedImage(req.file);
     }
     Object.assign(existing, { name, genre, date, time, bio });
   } else {
     const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
+    const image = await saveUploadedImage(req.file);
     djs.push({
       id: newId, name, genre, date, time, bio,
-      image: req.file ? req.file.filename : "",
+      image,
     });
   }
 
-  saveDJs(djs);
+  await saveDJs(djs);
   res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
-});
+}));
 
-app.delete("/admin/djs/:id", requireAdmin, (req, res) => {
-  let djs = loadDJs();
+app.delete("/admin/djs/:id", requireAdmin, asyncHandler(async (req, res) => {
+  let djs = await loadDJs();
   const dj = djs.find((d) => d.id === +req.params.id);
-  if (dj) removeImage(dj.image);
+  if (dj) await removeImage(dj.image);
   djs = djs.filter((d) => d.id !== +req.params.id);
-  saveDJs(djs);
+  await saveDJs(djs);
   res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
-});
+}));
 
 function adminDJList(djs) {
   return djs
@@ -671,8 +766,8 @@ function adminDJList(djs) {
     .join("\n");
 }
 
-app.get("/admin/djs/edit/:id", requireAdmin, (req, res) => {
-  const djs = loadDJs();
+app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const djs = await loadDJs();
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
   res.send(`
@@ -695,10 +790,10 @@ app.get("/admin/djs/edit/:id", requireAdmin, (req, res) => {
       hx-swap="outerHTML">Cancel</button>
   </form>
 </div>`);
-});
+}));
 
-app.get("/admin/djs/cancel/:id", requireAdmin, (req, res) => {
-  const djs = loadDJs();
+app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const djs = await loadDJs();
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
   res.send(`
@@ -722,7 +817,7 @@ app.get("/admin/djs/cancel/:id", requireAdmin, (req, res) => {
       hx-confirm="Delete ${d.name}?">Delete</button>
   </div>
 </div>`);
-});
+}));
 
 // --- Helpers ---
 
