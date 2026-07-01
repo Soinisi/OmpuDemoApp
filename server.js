@@ -30,8 +30,90 @@ const upload = multer({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+const DEFAULT_HOME_CONTENT = `## The Room
+om'pu lives behind the old record shop on Vinyl Lane — you won't find a sign, just a warm orange glow spilling from under a heavy door. Step inside and the city disappears. Low ceilings, exposed brick, a wall of vinyl sleeves behind the bar. The sound system wasn't chosen — it was built. Warm, weighty, the kind that makes you feel bass in your chest before you hear it.
+
+The bar itself is a single slab of blackened oak. Behind it, shelves climb to the ceiling — bottles backlit in amber. No TVs. No fruit machines. No neon signs screaming for attention. Just a room that knows exactly what it is and doesn't need to explain itself.
+
+## The Drinks
+Every cocktail on the menu was built in this room, for this room. No borrowed recipes, no crowd-pleasing sugar bombs. The Old Fashioned is smoked with hickory. The Margarita runs black from activated charcoal. The Sour changes with the season — whatever fruit is worth using that week.
+
+Beer comes from breweries within fifty kilometres. Wine is natural, funky, alive — poured by people who can tell you the grower's name. If you want a vodka soda you can have one, but nobody's going to pretend it's a good idea.
+
+[See the full menu →](/drinks)
+
+## The Sound
+Music here isn't background — it's half the reason people come. Thursdays lean deep and hypnotic. Fridays stretch from funk to Afrobeat to whatever the selector pulled from a crate that afternoon. Saturdays go late — minimal, dub, the kind of techno that feels like a pulse rather than a song.
+
+All vinyl. No laptops. No playlists. Every DJ who plays here knows the room — knows how the sound fills the low corners, knows when to let the track breathe and when to push. Some nights you'll hear records that haven't been pressed since 1978. Some nights you'll hear things you can't find anywhere.
+
+[See who's playing →](/djs)
+
+## The Rules
+<strong>30+ only.</strong> Not a gimmick — just the kind of room we want. No ID, no entry. <strong>No photography.</strong> What happens here stays in the low light. <strong>No large groups.</strong> Four people max; six if you book ahead. <strong>No shouting across the bar.</strong> You're three feet from the bartender — use your voice.
+
+## Find Us
+42 Vinyl Lane — walk past the record shop, turn left at the courtyard, look for the orange light under the door. Knock twice.
+
+Thursday to Saturday, 20:00 until late. No reservations except for groups of four to six — email room@ompu.bar at least 48 hours ahead.`;
+
+function renderHomeContent(content) {
+  const lines = content.split("\n");
+  let html = "";
+  let inSection = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    let line = lines[i];
+
+    if (line.startsWith("## ")) {
+      if (inSection) html += '</section>\n';
+      html += '<section class="section reveal">\n';
+      html += `  <h2 class="section-title">${escapeHtml(line.slice(3).trim())}</h2>\n`;
+      inSection = true;
+      i++;
+      continue;
+    }
+
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
+
+    let paraLines = [];
+    while (i < lines.length && lines[i].trim() !== "" && !lines[i].startsWith("## ")) {
+      paraLines.push(lines[i].trim());
+      i++;
+    }
+    const paraText = paraLines.join(" ");
+    html += renderParagraph(paraText);
+  }
+
+  if (inSection) html += '</section>\n';
+  return html;
+}
+
+function renderParagraph(text) {
+  const linkMatch = text.match(/^\[(.+)\]\((.+)\)$/);
+  if (linkMatch) {
+    const label = linkMatch[1];
+    const href = linkMatch[2];
+    return `  <p style="margin-top:1.5rem">\n    <a href="${escapeHtml(href)}" class="nav-link" style="font-size:0.85rem">${escapeHtml(label)}</a>\n  </p>\n`;
+  }
+  return `  <p class="section-text">${text}</p>\n`;
 }
 
 // --- Data helpers ---
@@ -204,6 +286,10 @@ function indent(str, n) {
 
 app.get("/", asyncHandler(async (_req, res) => {
   const site = await loadSite();
+  const tagline = site.hero_tagline || "Drinks. Music. After dark.";
+  const hoursText = site.hero_opening_hours || "THU–SAT 20:00–02:00";
+  const hoursLines = hoursText.split("\n").map(l => l.trim()).filter(Boolean);
+  const bodyContent = renderHomeContent(site.home_content || DEFAULT_HOME_CONTENT);
   res.send(
     layout(
       "Home",
@@ -211,91 +297,13 @@ app.get("/", asyncHandler(async (_req, res) => {
 <div class="hero">
   ${site.hero_image ? `<div class="hero-bg"><img src="/images/${site.hero_image}" class="hero-bg-img"></div>` : ""}
   <img src="/logo.svg" alt="ompu" class="hero-logo">
-  <p class="hero-tagline">Drinks. Music. After dark.</p>
+  <p class="hero-tagline">${escapeHtml(tagline)}</p>
   <div class="hero-hours">
-    <span>THU–SAT</span>
-    <span class="hero-dot"></span>
-    <span>20:00–02:00</span>
+    ${hoursLines.map(escapeHtml).join('<span class="hero-dot"></span>')}
   </div>
 </div>
 
-<section class="section reveal">
-  <h2 class="section-title">The Room</h2>
-  <p class="section-text">
-    om'pu lives behind the old record shop on Vinyl Lane — you won't find a
-    sign, just a warm orange glow spilling from under a heavy door. Step inside
-    and the city disappears. Low ceilings, exposed brick, a wall of vinyl sleeves
-    behind the bar. The sound system wasn't chosen — it was built. Warm, weighty,
-    the kind that makes you feel bass in your chest before you hear it.
-  </p>
-  <p class="section-text" style="margin-top:1.25rem">
-    The bar itself is a single slab of blackened oak. Behind it, shelves climb
-    to the ceiling — bottles backlit in amber. No TVs. No fruit machines. No
-    neon signs screaming for attention. Just a room that knows exactly what it
-    is and doesn't need to explain itself.
-  </p>
-</section>
-
-<section class="section reveal">
-  <h2 class="section-title">The Drinks</h2>
-  <p class="section-text">
-    Every cocktail on the menu was built in this room, for this room. No
-    borrowed recipes, no crowd-pleasing sugar bombs. The Old Fashioned is
-    smoked with hickory. The Margarita runs black from activated charcoal.
-    The Sour changes with the season — whatever fruit is worth using that week.
-  </p>
-  <p class="section-text" style="margin-top:1.25rem">
-    Beer comes from breweries within fifty kilometres. Wine is natural,
-    funky, alive — poured by people who can tell you the grower's name.
-    If you want a vodka soda you can have one, but nobody's going to pretend
-    it's a good idea.
-  </p>
-  <p style="margin-top:1.5rem">
-    <a href="/drinks" class="nav-link" style="font-size:0.85rem">See the full menu →</a>
-  </p>
-</section>
-
-<section class="section reveal">
-  <h2 class="section-title">The Sound</h2>
-  <p class="section-text">
-    Music here isn't background — it's half the reason people come. Thursdays
-    lean deep and hypnotic. Fridays stretch from funk to Afrobeat to whatever
-    the selector pulled from a crate that afternoon. Saturdays go late — minimal,
-    dub, the kind of techno that feels like a pulse rather than a song.
-  </p>
-  <p class="section-text" style="margin-top:1.25rem">
-    All vinyl. No laptops. No playlists. Every DJ who plays here knows the room
-    — knows how the sound fills the low corners, knows when to let the track
-    breathe and when to push. Some nights you'll hear records that haven't been
-    pressed since 1978. Some nights you'll hear things you can't find anywhere.
-  </p>
-  <p style="margin-top:1.5rem">
-    <a href="/djs" class="nav-link" style="font-size:0.85rem">See who's playing →</a>
-  </p>
-</section>
-
-<section class="section reveal">
-  <h2 class="section-title">The Rules</h2>
-  <p class="section-text">
-    <strong>30+ only.</strong> Not a gimmick — just the kind of room we want.
-    No ID, no entry. <strong>No photography.</strong> What happens here stays
-    in the low light. <strong>No large groups.</strong> Four people max; six
-    if you book ahead. <strong>No shouting across the bar.</strong> You're
-    three feet from the bartender — use your voice.
-  </p>
-</section>
-
-<section class="section reveal">
-  <h2 class="section-title">Find Us</h2>
-  <p class="section-text">
-    42 Vinyl Lane — walk past the record shop, turn left at the courtyard,
-    look for the orange light under the door. Knock twice.
-  </p>
-  <p class="section-text muted" style="margin-top:0.75rem">
-    Thursday to Saturday, 20:00 until late. No reservations except for
-    groups of four to six — email room@ompu.bar at least 48 hours ahead.
-  </p>
-</section>`
+${bodyContent}`
     )
   );
 }));
@@ -494,6 +502,7 @@ app.post("/admin/logout", (req, res) => {
 
 app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
   const site = await loadSite();
+  const currentContent = site.home_content || DEFAULT_HOME_CONTENT;
   res.send(
     adminLayout(
       "Admin — Site",
@@ -510,6 +519,41 @@ app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
   <form hx-post="/admin/site/remove-hero" style="margin-top:0.5rem">
     <button class="btn btn-danger btn-sm">Remove</button>
   </form>` : ""}
+</div>
+<div class="admin-add-form">
+  <h2>Hero Text</h2>
+  <form hx-post="/admin/site/texts" hx-target="body" hx-swap="innerHTML">
+    <div style="display:flex;flex-direction:column;gap:1rem;width:100%;max-width:420px">
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Tagline</label>
+        <input type="text" name="hero_tagline" value="${escapeHtml(site.hero_tagline || "Drinks. Music. After dark.")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Opening Hours (one per line)</label>
+        <textarea name="hero_opening_hours" rows="3" class="input" style="width:100%;resize:vertical">${escapeHtml(site.hero_opening_hours || "THU–SAT 20:00–02:00")}</textarea>
+      </div>
+      <div>
+        <button class="btn">Save</button>
+      </div>
+    </div>
+  </form>
+</div>
+<div class="admin-add-form">
+  <h2>Homepage Content</h2>
+  <p class="muted" style="font-size:0.75rem;margin-bottom:0.75rem;line-height:1.5">
+    Lines starting with <code>## </code> become section headings.<br>
+    Separate paragraphs with a blank line.<br>
+    Use <code>[Label](URL)</code> to create a link.<br>
+    Any number of sections — add or remove freely.
+  </p>
+  <form hx-post="/admin/site/home" hx-target="body" hx-swap="innerHTML">
+    <div style="display:flex;flex-direction:column;gap:1rem;width:100%;max-width:700px">
+      <textarea name="home_content" rows="20" class="input" style="width:100%;resize:vertical;font-family:monospace;font-size:0.8rem;line-height:1.4">${escapeHtml(currentContent)}</textarea>
+      <div>
+        <button class="btn">Save</button>
+      </div>
+    </div>
+  </form>
 </div>`
     )
   );
@@ -529,6 +573,21 @@ app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) 
   const site = await loadSite();
   await removeImage(site.hero_image);
   site.hero_image = "";
+  await saveSite(site);
+  res.redirect("/admin/site");
+}));
+
+app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
+  const site = await loadSite();
+  site.hero_tagline = (req.body.hero_tagline || "").trim();
+  site.hero_opening_hours = (req.body.hero_opening_hours || "").trim();
+  await saveSite(site);
+  res.redirect("/admin/site");
+}));
+
+app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
+  const site = await loadSite();
+  site.home_content = (req.body.home_content || "").trim();
   await saveSite(site);
   res.redirect("/admin/site");
 }));
