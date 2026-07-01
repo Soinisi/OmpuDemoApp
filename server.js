@@ -7,11 +7,12 @@ const { getStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_PW = process.env.ADMIN_PASSWORD || "admin";
+const IS_NETLIFY = process.env.NETLIFY === "true";
+const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";
 const ROOT_DIR = __dirname;
-const USE_BLOBS = process.env.NETLIFY === "true" || process.env.USE_NETLIFY_BLOBS === "true";
+const USE_BLOBS = IS_NETLIFY || process.env.USE_NETLIFY_BLOBS === "true";
 
 function uploadName(file) {
   return Date.now() + "-" + path.basename(file.originalname).replace(/\s+/g, "-");
@@ -126,6 +127,11 @@ app.use(express.static(path.join(ROOT_DIR, "public")));
 function requireAdmin(req, res, next) {
   if (isAdmin(req)) return next();
   res.redirect("/admin");
+}
+
+function passwordMatches(password) {
+  if (!ADMIN_PW) return false;
+  return password === ADMIN_PW || password.trim() === ADMIN_PW.trim();
 }
 
 function getCookie(req, name) {
@@ -463,11 +469,15 @@ app.get("/admin", (_req, res) => {
 });
 
 app.post("/admin/login", (req, res) => {
-  if (req.body.password === ADMIN_PW) {
+  if (!ADMIN_PW) {
+    return res.status(500).send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">ADMIN_PASSWORD is not configured.</p>`);
+  }
+
+  if (passwordMatches(req.body.password || "")) {
     res.cookie(ADMIN_COOKIE, `1.${sign("1")}`, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NETLIFY === "true",
+      secure: IS_NETLIFY,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     });
     return res.redirect("/admin/drinks");
