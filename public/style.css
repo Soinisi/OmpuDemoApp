@@ -686,9 +686,10 @@ select.input {
   .nav-links { gap: 1.25rem; }
   .nav-link { font-size: 0.8rem; }
   .main { padding: 2rem 1rem 4rem; }
-  .hero { padding: 3rem 0; }
+  .hero { padding: 2rem 0 2.25rem; }
   .hero-logo { height: 160px; max-width: 100%; }
   .hero-tagline { font-size: 1.4rem; }
+  .section { margin-top: 3rem; }
   .page-title { font-size: 2.4rem; }
   .dj-item { grid-template-columns: 1fr; gap: 0.25rem 0; }
   .dj-date { grid-row: auto; flex-direction: row; gap: 0.5rem; }
