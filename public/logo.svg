@@ -3,10 +3,12 @@
     <mask id="logo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1792" height="768">
       <g fill="white">
         <circle cx="315" cy="315" r="177"/>
-        <path d="M500 126H654L676 249L701 126H850V492H712V392L676 480L637 392V492H500Z"/>
-        <path d="M880 126H916V169C916 202 901 218 879 218V187C890 187 895 178 895 163H880Z"/>
-        <path d="M942 126H1178C1240 126 1288 166 1288 230C1288 291 1240 328 1178 328H1101C1086 328 1073 340 1073 355V492H942Z"/>
-        <path d="M1294 126H1453V300C1453 319 1460 329 1474 329C1488 329 1495 319 1495 300V126H1648V300C1648 411 1579 477 1474 477C1368 477 1294 411 1294 300Z"/>
+        <g transform="translate(1074 309) scale(0.94) translate(-1074 -309)">
+          <path d="M500 126H654L676 249L701 126H850V492H712V392L676 480L637 392V492H500Z"/>
+          <path d="M880 126H916V169C916 202 901 218 879 218V187C890 187 895 178 895 163H880Z"/>
+          <path d="M942 126H1178C1240 126 1288 166 1288 230C1288 291 1240 328 1178 328H1101C1086 328 1073 340 1073 355V492H942Z"/>
+          <path d="M1294 126H1453V300C1453 319 1460 329 1474 329C1488 329 1495 319 1495 300V126H1648V300C1648 411 1579 477 1474 477C1368 477 1294 411 1294 300Z"/>
+        </g>
       </g>
 
       <g fill="black">
@@ -18,20 +20,22 @@
         <rect x="151" y="205" width="167" height="9" rx="5"/>
         <rect x="141" y="231" width="177" height="9" rx="5"/>
 
-        <rect x="500" y="130" width="143" height="9" rx="5"/>
-        <rect x="500" y="158" width="150" height="9" rx="5"/>
-        <rect x="500" y="186" width="158" height="9" rx="5"/>
-        <rect x="500" y="214" width="166" height="9" rx="5"/>
+        <g transform="translate(1074 309) scale(0.94) translate(-1074 -309)">
+          <rect x="500" y="130" width="143" height="9" rx="5"/>
+          <rect x="500" y="158" width="150" height="9" rx="5"/>
+          <rect x="500" y="186" width="158" height="9" rx="5"/>
+          <rect x="500" y="214" width="166" height="9" rx="5"/>
 
-        <rect x="942" y="132" width="318" height="9" rx="5"/>
-        <rect x="942" y="158" width="338" height="9" rx="5"/>
-        <rect x="942" y="185" width="346" height="9" rx="5"/>
-        <rect x="942" y="212" width="352" height="9" rx="5"/>
+          <rect x="942" y="132" width="318" height="9" rx="5"/>
+          <rect x="942" y="158" width="338" height="9" rx="5"/>
+          <rect x="942" y="185" width="346" height="9" rx="5"/>
+          <rect x="942" y="212" width="352" height="9" rx="5"/>
 
-        <rect x="1294" y="132" width="160" height="9" rx="5"/>
-        <rect x="1294" y="158" width="160" height="9" rx="5"/>
-        <rect x="1294" y="185" width="160" height="9" rx="5"/>
-        <rect x="1294" y="212" width="160" height="9" rx="5"/>
+          <rect x="1294" y="132" width="160" height="9" rx="5"/>
+          <rect x="1294" y="158" width="160" height="9" rx="5"/>
+          <rect x="1294" y="185" width="160" height="9" rx="5"/>
+          <rect x="1294" y="212" width="160" height="9" rx="5"/>
+        </g>
       </g>
     </mask>
   </defs>
