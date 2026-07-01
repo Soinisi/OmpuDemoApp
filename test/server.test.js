@@ -9,8 +9,10 @@ const TEST_PW = "test-password";
 // Backup data files
 const drinksPath = path.join(__dirname, "..", "data", "drinks.json");
 const djsPath = path.join(__dirname, "..", "data", "djs.json");
+const sitePath = path.join(__dirname, "..", "data", "site.json");
 const drinksBackup = fs.readFileSync(drinksPath, "utf-8");
 const djsBackup = fs.readFileSync(djsPath, "utf-8");
+const siteBackup = fs.readFileSync(sitePath, "utf-8");
 
 process.env.ADMIN_PASSWORD = TEST_PW;
 const app = require("../server");
@@ -31,6 +33,7 @@ after(() => {
   server.close();
   fs.writeFileSync(drinksPath, drinksBackup);
   fs.writeFileSync(djsPath, djsBackup);
+  fs.writeFileSync(sitePath, siteBackup);
   delete process.env.ADMIN_PASSWORD;
 });
 
@@ -311,5 +314,72 @@ describe("Admin DJ CRUD", () => {
     });
     const text = await res.text();
     assert.doesNotMatch(text, /Test DJ/);
+  });
+});
+
+// --- Admin Site texts ---
+
+describe("Admin Site texts", () => {
+  let adminCookie;
+
+  before(async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + TEST_PW,
+      redirect: "manual",
+    });
+    adminCookie = res.headers.get("set-cookie");
+  });
+
+  it("GET /admin/site shows hero text form", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/site", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Hero Text/);
+    assert.match(text, /hero_tagline/);
+    assert.match(text, /hero_opening_hours/);
+    assert.match(text, /Homepage Content/);
+    assert.match(text, /home_content/);
+    assert.match(text, /section headings/);
+  });
+
+  it("POST /admin/site/texts updates hero texts", async () => {
+    await globalThis.fetch(baseURL + "/admin/site/texts", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: "hero_tagline=Test+tagline&hero_opening_hours=Thu+22%3A00-02%3A00%0AFri+22%3A00-04%3A00",
+    });
+    const { status, text } = await fetch("/");
+    assert.equal(status, 200);
+    assert.match(text, /Test tagline/);
+    assert.match(text, /Thu 22:00-02:00/);
+    assert.match(text, /Fri 22:00-04:00/);
+  });
+
+  it("POST /admin/site/home updates homepage content", async () => {
+    const newContent = "## Welcome%0AThis is a test section.%0A%0AAnother paragraph.%0A%0A%5BGo to drinks%5D%28/drinks%29%0A%0A## Another Section%0AJust one paragraph here.";
+    await globalThis.fetch(baseURL + "/admin/site/home", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: "home_content=" + newContent,
+    });
+    const { status, text } = await fetch("/");
+    assert.equal(status, 200);
+    assert.match(text, /Welcome/);
+    assert.match(text, /This is a test section/);
+    assert.match(text, /Another paragraph/);
+    assert.match(text, /Go to drinks/);
+    assert.match(text, /Another Section/);
+    assert.match(text, /Just one paragraph here/);
+    assert.doesNotMatch(text, /The Room/);
+    assert.doesNotMatch(text, /The Drinks/);
   });
 });
