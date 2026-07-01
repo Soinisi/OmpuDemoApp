@@ -53,7 +53,7 @@ a:hover { color: var(--orange-warm); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
+  padding: 0 3.25rem 0 2rem;
   height: 64px;
   background: rgba(10,10,10,0.94);
   backdrop-filter: blur(16px);
@@ -65,7 +65,7 @@ a:hover { color: var(--orange-warm); }
 
 .nav-link {
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -682,10 +682,14 @@ select.input {
    ============================== */
 
 @media (max-width: 600px) {
+  .nav { padding: 0 1rem; }
+  .nav-links { gap: 1.25rem; }
+  .nav-link { font-size: 0.8rem; }
   .main { padding: 2rem 1rem 4rem; }
-  .hero { padding: 3rem 0; }
+  .hero { padding: 2rem 0 2.25rem; }
   .hero-logo { height: 160px; max-width: 100%; }
   .hero-tagline { font-size: 1.4rem; }
+  .section { margin-top: 3rem; }
   .page-title { font-size: 2.4rem; }
   .dj-item { grid-template-columns: 1fr; gap: 0.25rem 0; }
   .dj-date { grid-row: auto; flex-direction: row; gap: 0.5rem; }
