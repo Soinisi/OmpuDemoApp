@@ -500,6 +500,7 @@ describe("Admin Site texts", () => {
   });
 
   it("POST /admin/site/texts updates hero texts", async () => {
+    const backup = fs.readFileSync(sitePath, "utf-8");
     await globalThis.fetch(baseURL + "/admin/site/texts", {
       method: "POST",
       headers: {
@@ -513,9 +514,11 @@ describe("Admin Site texts", () => {
     assert.match(text, /Test tagline/);
     assert.match(text, /Thu 22:00-02:00/);
     assert.match(text, /Fri 22:00-04:00/);
+    fs.writeFileSync(sitePath, backup);
   });
 
   it("POST /admin/site/home updates homepage content", async () => {
+    const backup = fs.readFileSync(sitePath, "utf-8");
     const newContent = "## Welcome%0AThis is a test section.%0A%0AAnother paragraph.%0A%0A%5BGo to drinks%5D%28/drinks%29%0A%0A## Another Section%0AJust one paragraph here.";
     await globalThis.fetch(baseURL + "/admin/site/home", {
       method: "POST",
@@ -535,5 +538,6 @@ describe("Admin Site texts", () => {
     assert.match(text, /Just one paragraph here/);
     assert.doesNotMatch(text, /The Room/);
     assert.doesNotMatch(text, /The Drinks/);
+    fs.writeFileSync(sitePath, backup);
   });
 });
