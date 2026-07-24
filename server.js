@@ -363,7 +363,7 @@ function drinkCards(drinks) {
 <div class="drink-item reveal">
   ${d.image ? `<img src="/images/${d.image}" class="drink-photo">` : ""}
   <h3 class="drink-name">${d.name}</h3>
-  <span class="drink-price" data-price="${d.price}">€${d.price}</span>
+  ${d.price != null ? `<span class="drink-price" data-price="${d.price}">€${d.price}</span>` : ""}
   <p class="drink-desc">${d.description}</p>
 </div>`
     )
@@ -651,7 +651,7 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
       <option value="wine">Wine</option>
     </select>
     <input name="description" placeholder="Description" class="input">
-    <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input" required>
+    <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input">
     <input type="file" name="image" accept="image/*" class="input">
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
@@ -672,7 +672,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
       await removeImage(existing.image);
       existing.image = await saveUploadedImage(req.file);
     }
-    Object.assign(existing, { name, category, description, price: +price });
+    Object.assign(existing, { name, category, description, price: price ? +price : null });
     await saveDrinks(drinks);
     res.send(adminDrinkRow(existing));
     return;
@@ -681,7 +681,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
   const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
   const image = await saveUploadedImage(req.file);
   drinks.push({
-    id: newId, name, category, description, price: +price,
+    id: newId, name, category, description, price: price ? +price : null,
     image,
   });
   await saveDrinks(drinks);
@@ -709,7 +709,7 @@ function adminDrinkRow(d) {
     <span class="admin-row-name">${d.name}</span>
     <span class="tag">${d.category}</span>
     <span class="muted">${d.description}</span>
-    <span>€${d.price}</span>
+    ${d.price != null ? `<span>€${d.price}</span>` : ""}
   </div>
   <div class="admin-row-actions">
     <button class="btn btn-sm"
