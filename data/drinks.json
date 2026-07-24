@@ -124,5 +124,33 @@
     "category": "wine",
     "description": "Albariño, saline, bright",
     "price": 8
+  },
+  {
+    "id": 19,
+    "name": "House Cider",
+    "category": "cider",
+    "description": "Dry, crisp, local apples",
+    "price": 7
+  },
+  {
+    "id": 20,
+    "name": "Hard Seltzer",
+    "category": "others",
+    "description": "Lime, crisp, light",
+    "price": 7
+  },
+  {
+    "id": 21,
+    "name": "Single Malt",
+    "category": "spirits",
+    "description": "10yr Islay, neat or one rock",
+    "price": 15
+  },
+  {
+    "id": 22,
+    "name": "House Gin",
+    "category": "spirits",
+    "description": "Botanical, with Fever-Tree tonic",
+    "price": 11
   }
 ]

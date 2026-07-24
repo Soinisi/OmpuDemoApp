@@ -76,26 +76,29 @@ describe("Public pages", () => {
     const { status, text } = await fetch("/drinks");
     assert.equal(status, 200);
     assert.match(text, /Draft IPA/);
-    assert.match(text, /Cocktails/);
+    assert.match(text, /Hard Spirits/);
+    assert.match(text, /Beer, Cider &amp; Others/);
     assert.match(text, /drink-item/);
+    assert.match(text, /drink-group-title/);
   });
 
-  it("GET /drinks?cat=cocktails returns filtered fragment", async () => {
-    const { status, text } = await fetch("/drinks?cat=cocktails");
+  it("GET /drinks?tab=2 returns cocktails fragment", async () => {
+    const { status, text } = await fetch("/drinks?tab=2");
     assert.equal(status, 200);
     assert.match(text, /Ompu Old Fashioned/);
     assert.match(text, /Espresso Martini/);
     assert.match(text, /Ember Sour/);
     assert.match(text, /Black Margarita/);
-    // Should NOT contain full page layout
     assert.doesNotMatch(text, /<!DOCTYPE html>/);
   });
 
-  it("GET /drinks?cat=beer returns beer-only fragment", async () => {
-    const { status, text } = await fetch("/drinks?cat=beer");
+  it("GET /drinks?tab=0 returns beer categories with sub-headers", async () => {
+    const { status, text } = await fetch("/drinks?tab=0");
     assert.equal(status, 200);
     assert.match(text, /Draft IPA/);
-    assert.match(text, /Dark Lager/);
+    assert.match(text, /House Cider/);
+    assert.match(text, /Hard Seltzer/);
+    assert.match(text, /drink-group-title/);
     assert.doesNotMatch(text, /Ompu Old Fashioned/);
     assert.doesNotMatch(text, /<!DOCTYPE html>/);
   });

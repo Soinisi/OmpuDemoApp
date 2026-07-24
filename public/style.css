@@ -305,6 +305,24 @@ a:hover { color: var(--orange-warm); }
 }
 
 /* ==============================
+   Drink group sub-headers
+   ============================== */
+
+.drink-group-title {
+  font-family: var(--hand);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--divider);
+}
+
+.drink-group-title:first-child { padding-top: 0; }
+
+/* ==============================
    DJ list (poster/flyer feel)
    ============================== */
 
