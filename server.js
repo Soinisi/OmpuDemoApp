@@ -782,6 +782,18 @@ app.get("/admin/drinks/cancel/:id", requireAdmin, asyncHandler(async (req, res) 
 
 // --- DJ CRUD ---
 
+function parseEUDate(str) {
+  const parts = str.split("/");
+  if (parts.length !== 3) return str;
+  return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+}
+
+function formatEUDate(str) {
+  if (!str || !str.includes("-")) return str;
+  const [y, m, d] = str.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
   const djs = (await loadDJs()).sort((a, b) => new Date(b.date) - new Date(a.date));
   res.send(
@@ -798,7 +810,7 @@ app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
         hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
     <input name="name" placeholder="Name" class="input" required>
     <input name="genre" placeholder="Genre" class="input" required>
-    <input name="date" type="date" class="input" required>
+    <input name="date" type="text" placeholder="dd/mm/yyyy" class="input" required>
     <input name="time" type="time" class="input" required>
     <input name="bio" placeholder="Short bio" class="input">
     <input type="file" name="image" accept="image/*" class="input">
@@ -813,6 +825,7 @@ app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
 app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
   const djs = await loadDJs();
   const { id, name, genre, date, time, bio } = req.body;
+  const parsedDate = parseEUDate(date);
 
   const existing = +id > 0 ? djs.find((d) => d.id === +id) : null;
 
@@ -821,12 +834,12 @@ app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async 
       await removeImage(existing.image);
       existing.image = await saveUploadedImage(req.file);
     }
-    Object.assign(existing, { name, genre, date, time, bio });
+    Object.assign(existing, { name, genre, date: parsedDate, time, bio });
   } else {
     const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
     const image = await saveUploadedImage(req.file);
     djs.push({
-      id: newId, name, genre, date, time, bio,
+      id: newId, name, genre, date: parsedDate, time, bio,
       image,
     });
   }
@@ -853,7 +866,7 @@ function adminDJList(djs) {
     ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
     <span class="admin-row-name">${d.name}</span>
     <span class="tag">${d.genre}</span>
-    <span class="muted">${d.date} ${d.time}</span>
+    <span class="muted">${formatEUDate(d.date)} ${d.time}</span>
     <span>${d.bio}</span>
   </div>
   <div class="admin-row-actions">
@@ -884,7 +897,7 @@ app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
     <input type="hidden" name="id" value="${d.id}">
     <input name="name" value="${d.name}" class="input" style="flex:1;min-width:120px">
     <input name="genre" value="${d.genre}" class="input" style="width:140px">
-    <input name="date" type="date" value="${d.date}" class="input" style="width:140px">
+    <input name="date" type="text" placeholder="dd/mm/yyyy" value="${formatEUDate(d.date)}" class="input" style="width:140px">
     <input name="time" type="time" value="${d.time}" class="input" style="width:110px">
     <input name="bio" value="${d.bio}" class="input" style="flex:2;min-width:150px">
     <input type="file" name="image" accept="image/*" class="input">
@@ -908,7 +921,7 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
     ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
     <span class="admin-row-name">${d.name}</span>
     <span class="tag">${d.genre}</span>
-    <span class="muted">${d.date} ${d.time}</span>
+    <span class="muted">${formatEUDate(d.date)} ${d.time}</span>
     <span>${d.bio}</span>
   </div>
   <div class="admin-row-actions">
