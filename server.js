@@ -503,8 +503,7 @@ function adminLayout(title, body) {
   <nav class="nav admin-nav">
     <a href="/admin/drinks" class="nav-link${title.includes("Drinks") ? " active" : ""}">Manage Drinks</a>
     <a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>
-    <a href="/admin/art" class="nav-link${title.includes("Art") && !title.includes("Artists") ? " active" : ""}">Manage Art</a>
-    <a href="/admin/artists" class="nav-link${title.includes("Artists") ? " active" : ""}">Manage Artists</a>
+    <a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>
     <a href="/admin/site" class="nav-link${title.includes("Site") ? " active" : ""}">Site</a>
     <a href="/" class="nav-link">View Site</a>
     <form action="/admin/logout" method="post" style="display:inline">
@@ -929,15 +928,30 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   res.send(adminDJRow(d));
 }));
 
-// --- Art CRUD ---
+// --- Art CRUD (includes Artists) ---
 
 app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
   const artworks = await loadArtworks();
+  const artists = await loadArtists();
   res.send(
     adminLayout(
       "Admin — Art",
       `
 <h1 class="page-title">Art</h1>
+<div id="artist-admin-list">
+  ${adminArtistList(artists)}
+</div>
+<div class="admin-add-form">
+  <h2>Add Artist</h2>
+  <form hx-post="/admin/artists" hx-target="#artist-admin-list" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
+    <input name="name" placeholder="Name" class="input" required>
+    <input name="bio" placeholder="Bio" class="input" style="flex:2;min-width:200px">
+    <input type="file" name="image" accept="image/*" class="input">
+    <input type="hidden" name="id" value="0">
+    <button class="btn">Add</button>
+  </form>
+</div>
 <div id="artwork-admin-list">
   ${adminArtworkList(artworks)}
 </div>
@@ -1043,33 +1057,6 @@ app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
   res.send(adminArtworkRow(a));
-}));
-
-// --- Artist CRUD ---
-
-app.get("/admin/artists", requireAdmin, asyncHandler(async (_req, res) => {
-  const artists = await loadArtists();
-  res.send(
-    adminLayout(
-      "Admin — Artists",
-      `
-<h1 class="page-title">Artists</h1>
-<div id="artist-admin-list">
-  ${adminArtistList(artists)}
-</div>
-<div class="admin-add-form">
-  <h2>Add Artist</h2>
-  <form hx-post="/admin/artists" hx-target="#artist-admin-list" hx-swap="innerHTML"
-        hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
-    <input name="name" placeholder="Name" class="input" required>
-    <input name="bio" placeholder="Bio" class="input" style="flex:2;min-width:200px">
-    <input type="file" name="image" accept="image/*" class="input">
-    <input type="hidden" name="id" value="0">
-    <button class="btn">Add</button>
-  </form>
-</div>`
-    )
-  );
 }));
 
 app.post("/admin/artists", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {

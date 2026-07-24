@@ -490,14 +490,14 @@ describe("Admin Artist CRUD", () => {
     adminCookie = res.headers.get("set-cookie");
   });
 
-  it("artist list shows artists", async () => {
-    const res = await globalThis.fetch(baseURL + "/admin/artists", {
+  it("artist list shows artists on art admin page", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
       headers: { cookie: adminCookie },
     });
     const text = await res.text();
     assert.match(text, /Elena Vos/);
     assert.match(text, /Marcus Berg/);
-    assert.match(text, /Manage Artists/);
+    assert.match(text, /Add Artist/);
   });
 
   it("adds a new artist", async () => {
@@ -515,7 +515,7 @@ describe("Admin Artist CRUD", () => {
   });
 
   it("deletes the test artist", async () => {
-    const listRes = await globalThis.fetch(baseURL + "/admin/artists", {
+    const listRes = await globalThis.fetch(baseURL + "/admin/art", {
       headers: { cookie: adminCookie },
     });
     const listText = await listRes.text();
