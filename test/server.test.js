@@ -11,10 +11,12 @@ const drinksPath = path.join(__dirname, "..", "data", "drinks.json");
 const djsPath = path.join(__dirname, "..", "data", "djs.json");
 const sitePath = path.join(__dirname, "..", "data", "site.json");
 const artworksPath = path.join(__dirname, "..", "data", "artworks.json");
+const artistsPath = path.join(__dirname, "..", "data", "artists.json");
 const drinksBackup = fs.readFileSync(drinksPath, "utf-8");
 const djsBackup = fs.readFileSync(djsPath, "utf-8");
 const siteBackup = fs.readFileSync(sitePath, "utf-8");
 const artworksBackup = fs.readFileSync(artworksPath, "utf-8");
+const artistsBackup = fs.readFileSync(artistsPath, "utf-8");
 
 process.env.ADMIN_PASSWORD = TEST_PW;
 const app = require("../server");
@@ -37,6 +39,7 @@ after(() => {
   fs.writeFileSync(djsPath, djsBackup);
   fs.writeFileSync(sitePath, siteBackup);
   fs.writeFileSync(artworksPath, artworksBackup);
+  fs.writeFileSync(artistsPath, artistsBackup);
   delete process.env.ADMIN_PASSWORD;
 });
 
@@ -107,12 +110,13 @@ describe("Public pages", () => {
     assert.match(text, /dj-item/);
   });
 
-  it("GET /art returns art page with artworks", async () => {
+  it("GET /art returns art page with artists and artworks", async () => {
     const { status, text } = await fetch("/art");
     assert.equal(status, 200);
+    assert.match(text, /Artists/);
+    assert.match(text, /Elena Vos/);
+    assert.match(text, /artist-item/);
     assert.match(text, /Emerge/);
-    assert.match(text, /Low Light Series/);
-    assert.match(text, /Concrete Garden/);
     assert.match(text, /artwork-item/);
   });
 });
@@ -466,6 +470,83 @@ describe("Admin Art CRUD", () => {
     });
     const text = await res.text();
     assert.match(text, /Emerge/);
+    assert.match(text, /Edit/);
+    assert.match(text, /Delete/);
+  });
+});
+
+// --- Admin Artist CRUD ---
+
+describe("Admin Artist CRUD", () => {
+  let adminCookie;
+
+  before(async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + TEST_PW,
+      redirect: "manual",
+    });
+    adminCookie = res.headers.get("set-cookie");
+  });
+
+  it("artist list shows artists on art admin page", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Elena Vos/);
+    assert.match(text, /Marcus Berg/);
+    assert.match(text, /Add Artist/);
+  });
+
+  it("adds a new artist", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/artists", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: "id=0&name=Test+Artist&bio=Test+bio",
+    });
+    const text = await res.text();
+    assert.match(text, /Test Artist/);
+    assert.match(text, /Test bio/);
+  });
+
+  it("deletes the test artist", async () => {
+    const listRes = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: adminCookie },
+    });
+    const listText = await listRes.text();
+    const id = findRowId(listText, "artist", "Test Artist");
+    assert.ok(id, "Could not find Test Artist's id");
+
+    const res = await globalThis.fetch(baseURL + "/admin/artists/" + id, {
+      method: "DELETE",
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.doesNotMatch(text, /Test Artist/);
+  });
+
+  it("edit endpoint returns edit form", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/artists/edit/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Elena Vos/);
+    assert.match(text, /Save/);
+    assert.match(text, /Cancel/);
+    assert.match(text, /admin-row-edit/);
+  });
+
+  it("cancel endpoint returns display row", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/artists/cancel/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Elena Vos/);
     assert.match(text, /Edit/);
     assert.match(text, /Delete/);
   });

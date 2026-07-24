@@ -166,6 +166,12 @@ function loadArtworks() {
 function saveArtworks(data) {
   return saveData("artworks", data);
 }
+function loadArtists() {
+  return loadData("artists");
+}
+function saveArtists(data) {
+  return saveData("artists", data);
+}
 function loadSite() {
   return loadData("site");
 }
@@ -432,6 +438,7 @@ function djRow(d) {
 
 app.get("/art", asyncHandler(async (_req, res) => {
   const artworks = await loadArtworks();
+  const artists = await loadArtists();
   res.send(
     layout(
       "Art",
@@ -440,14 +447,37 @@ app.get("/art", asyncHandler(async (_req, res) => {
   <h1 class="page-title">Art</h1>
   <p class="page-subtitle">Work exhibited inside the room. Rotating monthly.</p>
 </div>
-<div class="artwork-list">
+${artists.length ? artistsSection(artists) : ""}
+<section class="section reveal">
+  <h2 class="section-title">Artworks</h2>
+  <div class="artwork-list">
 ${artworks.length
   ? artworks.map(artworkCard).join("\n")
   : '<p class="empty">No artworks yet.</p>'}
-</div>`
+  </div>
+</section>`
     )
   );
 }));
+
+function artistsSection(artists) {
+  return `
+<section class="section reveal">
+  <h2 class="section-title">Artists</h2>
+  <div class="artist-list">
+    ${artists.map(artistCard).join("\n  ")}
+  </div>
+</section>`;
+}
+
+function artistCard(a) {
+  return `
+<div class="artist-item reveal">
+  ${a.image ? `<img src="/images/${a.image}" class="artist-photo" loading="lazy">` : ""}
+  <h3 class="artist-name">${a.name}</h3>
+  <p class="artist-bio">${a.bio}</p>
+</div>`;
+}
 
 function artworkCard(a) {
   return `
@@ -549,7 +579,7 @@ function sitePageBody(site) {
     <button class="btn">Upload</button>
   </form>
   ${site.hero_image ? `
-  <form hx-post="/admin/site/remove-hero" style="margin-top:0.5rem">
+  <form hx-post="/admin/site/remove-hero" hx-target="body" hx-swap="innerHTML" style="margin-top:0.5rem">
     <button class="btn btn-danger btn-sm">Remove</button>
   </form>` : ""}
 </div>
@@ -901,15 +931,34 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   res.send(adminDJRow(d));
 }));
 
-// --- Art CRUD ---
+// --- Art CRUD (includes Artists) ---
 
 app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
   const artworks = await loadArtworks();
+  const artists = await loadArtists();
   res.send(
     adminLayout(
       "Admin — Art",
       `
 <h1 class="page-title">Art</h1>
+
+<h2 class="section-title">Artists</h2>
+<div id="artist-admin-list">
+  ${adminArtistList(artists)}
+</div>
+<div class="admin-add-form">
+  <h2>Add Artist</h2>
+  <form hx-post="/admin/artists" hx-target="#artist-admin-list" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
+    <input name="name" placeholder="Name" class="input" required>
+    <input name="bio" placeholder="Bio" class="input" style="flex:2;min-width:200px">
+    <input type="file" name="image" accept="image/*" class="input">
+    <input type="hidden" name="id" value="0">
+    <button class="btn">Add</button>
+  </form>
+</div>
+
+<h2 class="section-title">Artworks</h2>
 <div id="artwork-admin-list">
   ${adminArtworkList(artworks)}
 </div>
@@ -1015,6 +1064,95 @@ app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
   res.send(adminArtworkRow(a));
+}));
+
+app.post("/admin/artists", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+  const artists = await loadArtists();
+  const { id, name, bio } = req.body;
+
+  const existing = +id > 0 ? artists.find((a) => a.id === +id) : null;
+
+  if (existing) {
+    if (req.file) {
+      await removeImage(existing.image);
+      existing.image = await saveUploadedImage(req.file);
+    }
+    Object.assign(existing, { name, bio });
+    await saveArtists(artists);
+    res.send(adminArtistRow(existing));
+    return;
+  }
+
+  const newId = artists.length ? Math.max(...artists.map((a) => a.id)) + 1 : 1;
+  const image = await saveUploadedImage(req.file);
+  artists.push({ id: newId, name, bio, image });
+  await saveArtists(artists);
+  res.send(adminArtistList(artists));
+}));
+
+app.delete("/admin/artists/:id", requireAdmin, asyncHandler(async (req, res) => {
+  let artists = await loadArtists();
+  const artist = artists.find((a) => a.id === +req.params.id);
+  if (artist) await removeImage(artist.image);
+  artists = artists.filter((a) => a.id !== +req.params.id);
+  await saveArtists(artists);
+  res.send(adminArtistList(artists));
+}));
+
+function adminArtistList(artists) {
+  return artists.map(adminArtistRow).join("\n");
+}
+
+function adminArtistRow(a) {
+  return `
+<div class="admin-row" id="artist-${a.id}">
+  <div class="admin-row-info">
+    ${a.image ? `<img src="/images/${a.image}" class="admin-thumb">` : ""}
+    <span class="admin-row-name">${a.name}</span>
+    <span class="muted">${a.bio}</span>
+  </div>
+  <div class="admin-row-actions">
+    <button class="btn btn-sm"
+      hx-get="/admin/artists/edit/${a.id}"
+      hx-target="#artist-${a.id}"
+      hx-swap="outerHTML">Edit</button>
+    <button class="btn btn-sm btn-danger"
+      hx-delete="/admin/artists/${a.id}"
+      hx-target="#artist-admin-list"
+      hx-swap="innerHTML"
+      hx-confirm="Delete ${a.name}?">Delete</button>
+  </div>
+</div>`;
+}
+
+app.get("/admin/artists/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const artists = await loadArtists();
+  const a = artists.find((a) => a.id === +req.params.id);
+  if (!a) return res.status(404).send("Not found");
+  res.send(`
+<div class="admin-row admin-row-edit" id="artist-${a.id}">
+  <form hx-post="/admin/artists" hx-target="#artist-${a.id}" hx-swap="outerHTML"
+        hx-encoding="multipart/form-data"
+        style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;width:100%">
+    <input type="hidden" name="id" value="${a.id}">
+    <input name="name" value="${a.name}" class="input" style="flex:1;min-width:150px">
+    <input name="bio" value="${a.bio}" class="input" style="flex:2;min-width:200px">
+    <input type="file" name="image" accept="image/*" class="input">
+    ${a.image ? `<span class="muted" style="font-size:0.7rem">Current: ${a.image}</span>` : ""}
+    <button class="btn btn-sm">Save</button>
+    <button type="button" class="btn btn-sm btn-ghost"
+      hx-get="/admin/artists/cancel/${a.id}"
+      hx-target="#artist-${a.id}"
+      hx-swap="outerHTML">Cancel</button>
+  </form>
+</div>`);
+}));
+
+app.get("/admin/artists/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const artists = await loadArtists();
+  const a = artists.find((a) => a.id === +req.params.id);
+  if (!a) return res.send("");
+  res.send(adminArtistRow(a));
 }));
 
 // --- Helpers ---

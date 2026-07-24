@@ -27,7 +27,7 @@ ADMIN_PASSWORD=yourpass node server.js
 - Admin pages at `/admin` CRUD these — writes back to JSON files via `fs.writeFileSync`
 - Each drink/DJ can have an optional `image` field (filename in `public/images/`)
 - `data/site.json` holds site-level settings (`hero_image`)
-- Admin auth: session-based (`express-session`), password from `ADMIN_PASSWORD` env var
+- Admin auth: signed HMAC cookie, password from `ADMIN_PASSWORD` env var
 - Admin forms with file inputs use `hx-encoding="multipart/form-data"` + multer middleware
 
 ## Conventions

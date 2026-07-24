@@ -425,6 +425,47 @@ a:hover { color: var(--orange-warm); }
 }
 
 /* ==============================
+   Artist list
+   ============================== */
+
+.artist-list { display: flex; flex-direction: column; }
+
+.artist-item {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 0;
+  border-bottom: 1px dashed var(--divider);
+}
+
+.artist-item:first-child { padding-top: 0; }
+
+.artist-photo {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  filter: grayscale(100%) contrast(1.1) brightness(0.6);
+  opacity: 0.7;
+  border-radius: 30% 70% 65% 35% / 35% 45% 55% 65%;
+  margin-bottom: 1rem;
+}
+
+.artist-name {
+  font-family: var(--hand);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+}
+
+.artist-bio {
+  font-family: var(--hand-body);
+  font-size: 1.1rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* ==============================
    Toggle
    ============================== */
 
@@ -745,4 +786,7 @@ select.input {
   .artwork-photo { max-height: 280px; }
   .artwork-name { font-size: 1.4rem; }
   .artwork-desc { font-size: 0.95rem; }
+  .artist-photo { max-height: 220px; }
+  .artist-name { font-size: 1.4rem; }
+  .artist-bio { font-size: 0.95rem; }
 }
