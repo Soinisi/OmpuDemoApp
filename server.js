@@ -126,12 +126,14 @@ function readLocalData(name) {
   return JSON.parse(fs.readFileSync(dataPath(name), "utf-8"));
 }
 
-async function loadData(name) {
+async function loadData(name, opts = {}) {
   if (!USE_BLOBS) return readLocalData(name);
 
   const store = getStore("ompu-data");
   const key = `${name}.json`;
-  const data = await store.get(key, { type: "json" });
+  const getOpts = { type: "json" };
+  if (opts.consistency) getOpts.consistency = opts.consistency;
+  const data = await store.get(key, getOpts);
   if (data !== null) return data;
 
   const seed = readLocalData(name);
@@ -148,26 +150,26 @@ async function saveData(name, data) {
   fs.writeFileSync(dataPath(name), JSON.stringify(data, null, 2));
 }
 
-function loadDrinks() {
-  return loadData("drinks");
+function loadDrinks(opts) {
+  return loadData("drinks", opts);
 }
 function saveDrinks(data) {
   return saveData("drinks", data);
 }
-function loadDJs() {
-  return loadData("djs");
+function loadDJs(opts) {
+  return loadData("djs", opts);
 }
 function saveDJs(data) {
   return saveData("djs", data);
 }
-function loadArtworks() {
-  return loadData("artworks");
+function loadArtworks(opts) {
+  return loadData("artworks", opts);
 }
 function saveArtworks(data) {
   return saveData("artworks", data);
 }
-function loadSite() {
-  return loadData("site");
+function loadSite(opts) {
+  return loadData("site", opts);
 }
 function saveSite(data) {
   return saveData("site", data);
@@ -538,7 +540,7 @@ app.post("/admin/logout", (req, res) => {
 // --- Site settings ---
 
 app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
-  const site = await loadSite();
+  const site = await loadSite({ consistency: "strong" });
   const currentContent = site.home_content || DEFAULT_HOME_CONTENT;
   res.send(
     adminLayout(
@@ -597,7 +599,7 @@ app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
 }));
 
 app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
-  const site = await loadSite();
+  const site = await loadSite({ consistency: "strong" });
   if (req.file) {
     await removeImage(site.hero_image);
     site.hero_image = await saveUploadedImage(req.file);
@@ -607,7 +609,7 @@ app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async
 }));
 
 app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) => {
-  const site = await loadSite();
+  const site = await loadSite({ consistency: "strong" });
   await removeImage(site.hero_image);
   site.hero_image = "";
   await saveSite(site);
@@ -615,7 +617,7 @@ app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) 
 }));
 
 app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
-  const site = await loadSite();
+  const site = await loadSite({ consistency: "strong" });
   site.hero_tagline = (req.body.hero_tagline || "").trim();
   site.hero_opening_hours = (req.body.hero_opening_hours || "").trim();
   await saveSite(site);
@@ -623,7 +625,7 @@ app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
-  const site = await loadSite();
+  const site = await loadSite({ consistency: "strong" });
   site.home_content = (req.body.home_content || "").trim();
   await saveSite(site);
   res.redirect("/admin/site");
@@ -632,7 +634,7 @@ app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
 // --- Drink CRUD ---
 
 app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
-  const drinks = await loadDrinks();
+  const drinks = await loadDrinks({ consistency: "strong" });
   res.send(
     adminLayout(
       "Admin — Drinks",
@@ -663,7 +665,7 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
 }));
 
 app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
-  const drinks = await loadDrinks();
+  const drinks = await loadDrinks({ consistency: "strong" });
   const { id, name, category, description, price } = req.body;
 
   const existing = +id > 0 ? drinks.find((d) => d.id === +id) : null;
@@ -688,7 +690,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
 }));
 
 app.delete("/admin/drinks/:id", requireAdmin, asyncHandler(async (req, res) => {
-  let drinks = await loadDrinks();
+  let drinks = await loadDrinks({ consistency: "strong" });
   const drink = drinks.find((d) => d.id === +req.params.id);
   if (drink) await removeImage(drink.image);
   drinks = drinks.filter((d) => d.id !== +req.params.id);
@@ -725,7 +727,7 @@ function adminDrinkList(drinks) {
 }
 
 app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const drinks = await loadDrinks();
+  const drinks = await loadDrinks({ consistency: "strong" });
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
   res.send(`
@@ -754,7 +756,7 @@ app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) =>
 }));
 
 app.get("/admin/drinks/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const drinks = await loadDrinks();
+  const drinks = await loadDrinks({ consistency: "strong" });
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
   res.send(`
@@ -795,7 +797,7 @@ function formatEUDate(str) {
 }
 
 app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
-  const djs = (await loadDJs()).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const djs = (await loadDJs({ consistency: "strong" })).sort((a, b) => new Date(b.date) - new Date(a.date));
   res.send(
     adminLayout(
       "Admin — DJs",
@@ -823,7 +825,7 @@ app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
 }));
 
 app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
-  const djs = await loadDJs();
+  const djs = await loadDJs({ consistency: "strong" });
   const { id, name, genre, date, time, bio } = req.body;
   const parsedDate = parseEUDate(date);
 
@@ -849,7 +851,7 @@ app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async 
 }));
 
 app.delete("/admin/djs/:id", requireAdmin, asyncHandler(async (req, res) => {
-  let djs = await loadDJs();
+  let djs = await loadDJs({ consistency: "strong" });
   const dj = djs.find((d) => d.id === +req.params.id);
   if (dj) await removeImage(dj.image);
   djs = djs.filter((d) => d.id !== +req.params.id);
@@ -886,7 +888,7 @@ function adminDJList(djs) {
 }
 
 app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const djs = await loadDJs();
+  const djs = await loadDJs({ consistency: "strong" });
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
   res.send(`
@@ -912,7 +914,7 @@ app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const djs = await loadDJs();
+  const djs = await loadDJs({ consistency: "strong" });
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
   res.send(`
@@ -941,7 +943,7 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
 // --- Art CRUD ---
 
 app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
-  const artworks = await loadArtworks();
+  const artworks = await loadArtworks({ consistency: "strong" });
   res.send(
     adminLayout(
       "Admin — Art",
@@ -966,7 +968,7 @@ app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
 }));
 
 app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
-  const artworks = await loadArtworks();
+  const artworks = await loadArtworks({ consistency: "strong" });
   const { id, name, description } = req.body;
 
   const existing = +id > 0 ? artworks.find((a) => a.id === +id) : null;
@@ -988,7 +990,7 @@ app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async 
 }));
 
 app.delete("/admin/art/:id", requireAdmin, asyncHandler(async (req, res) => {
-  let artworks = await loadArtworks();
+  let artworks = await loadArtworks({ consistency: "strong" });
   const artwork = artworks.find((a) => a.id === +req.params.id);
   if (artwork) await removeImage(artwork.image);
   artworks = artworks.filter((a) => a.id !== +req.params.id);
@@ -1023,7 +1025,7 @@ function adminArtworkList(artworks) {
 }
 
 app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const artworks = await loadArtworks();
+  const artworks = await loadArtworks({ consistency: "strong" });
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.status(404).send("Not found");
   res.send(`
@@ -1046,7 +1048,7 @@ app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
-  const artworks = await loadArtworks();
+  const artworks = await loadArtworks({ consistency: "strong" });
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
   res.send(`
