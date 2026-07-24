@@ -305,14 +305,14 @@ describe("Admin DJ CRUD", () => {
         "content-type": "application/x-www-form-urlencoded",
         cookie: adminCookie,
       },
-      body: "id=0&name=Test+DJ&genre=Test+Genre&date=2026-12-25&time=23:00&bio=Test+bio",
+      body: "id=0&name=Test+DJ&genre=Test+Genre&date=25/12/2026&time=23:00&bio=Test+bio",
     });
     const text = await res.text();
     assert.match(text, /Test DJ/);
     assert.match(text, /Test Genre/);
   });
 
-  it("deletes the test DJ", async () => {
+  it("edits an existing DJ", async () => {
     const listRes = await globalThis.fetch(baseURL + "/admin/djs", {
       headers: { cookie: adminCookie },
     });
@@ -320,12 +320,56 @@ describe("Admin DJ CRUD", () => {
     const id = findRowId(listText, "dj", "Test DJ");
     assert.ok(id, "Could not find Test DJ's id");
 
+    const res = await globalThis.fetch(baseURL + "/admin/djs", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: `id=${id}&name=Test+DJ+Edited&genre=Edited+Genre&date=26/12/2026&time=22:00&bio=Edited+bio`,
+    });
+    const text = await res.text();
+    assert.match(text, /Test DJ Edited/);
+    assert.match(text, /Edited Genre/);
+    assert.match(text, /26\/12\/2026/);
+  });
+
+  it("deletes the test DJ", async () => {
+    const listRes = await globalThis.fetch(baseURL + "/admin/djs", {
+      headers: { cookie: adminCookie },
+    });
+    const listText = await listRes.text();
+    const id = findRowId(listText, "dj", "Test DJ Edited");
+    assert.ok(id, "Could not find Test DJ Edited's id");
+
     const res = await globalThis.fetch(baseURL + "/admin/djs/" + id, {
       method: "DELETE",
       headers: { cookie: adminCookie },
     });
     const text = await res.text();
-    assert.doesNotMatch(text, /Test DJ/);
+    assert.doesNotMatch(text, /Test DJ Edited/);
+  });
+
+  it("edit endpoint returns edit form with EU date", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs/edit/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /DJ Solstice/);
+    assert.match(text, /Save/);
+    assert.match(text, /Cancel/);
+    assert.match(text, /admin-row-edit/);
+    assert.match(text, /dd\/mm\/yyyy/);
+  });
+
+  it("cancel endpoint returns display row", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs/cancel/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /DJ Solstice/);
+    assert.match(text, /Edit/);
+    assert.match(text, /Delete/);
   });
 });
 
