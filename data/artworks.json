@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "name": "Emerge",
+    "description": "Acrylic and charcoal on canvas. A study in pressure and release — the moment before something surfaces.",
+    "image": ""
+  },
+  {
+    "id": 2,
+    "name": "Low Light Series #3",
+    "description": "Giclée print. Shot inside the room during a Kael set — long exposure, no flash. The bar at 2am, rendered in smoke and orange glow.",
+    "image": ""
+  },
+  {
+    "id": 3,
+    "name": "Concrete Garden",
+    "description": "Mixed media on reclaimed wood. Flora pushing through cracks — a collaboration with local ceramicist Elina Vos.",
+    "image": ""
+  },
+  {
+    "id": 4,
+    "name": "Forty-Two",
+    "description": "Charcoal on paper. The courtyard gate at closing time. Empty chairs. One light still on.",
+    "image": ""
+  }
+]

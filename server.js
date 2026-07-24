@@ -7,7 +7,7 @@ const { getStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const IS_NETLIFY = process.env.NETLIFY === "true";
+const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY === "true";
 const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";
@@ -160,6 +160,12 @@ function loadDJs() {
 function saveDJs(data) {
   return saveData("djs", data);
 }
+function loadArtworks() {
+  return loadData("artworks");
+}
+function saveArtworks(data) {
+  return saveData("artworks", data);
+}
 function loadSite() {
   return loadData("site");
 }
@@ -260,6 +266,7 @@ function layout(title, body) {
     <div class="nav-links">
       <a href="/drinks" class="nav-link${title === "Drinks" ? " active" : ""}">Drinks</a>
       <a href="/djs" class="nav-link${title === "DJs" ? " active" : ""}">DJs</a>
+      <a href="/art" class="nav-link${title === "Art" ? " active" : ""}">Art</a>
     </div>
   </nav>
   <main class="main" id="main">
@@ -310,7 +317,8 @@ ${bodyContent}`
 
 app.get("/drinks", asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
-  const categories = [...new Set(drinks.map((d) => d.category))];
+  const allCats = ["beer", "wine", "cocktails"];
+  const categories = allCats.filter((c) => drinks.some((d) => d.category === c));
   const selectedCat = req.query.cat || categories[0];
 
   if (req.query.cat) {
@@ -422,6 +430,34 @@ function djRow(d) {
 </div>`;
 }
 
+app.get("/art", asyncHandler(async (_req, res) => {
+  const artworks = await loadArtworks();
+  res.send(
+    layout(
+      "Art",
+      `
+<div class="page-header">
+  <h1 class="page-title">Art</h1>
+  <p class="page-subtitle">Work exhibited inside the room. Rotating monthly.</p>
+</div>
+<div class="artwork-list">
+${artworks.length
+  ? artworks.map(artworkCard).join("\n")
+  : '<p class="empty">No artworks yet.</p>'}
+</div>`
+    )
+  );
+}));
+
+function artworkCard(a) {
+  return `
+<div class="artwork-item reveal">
+  ${a.image ? `<img src="/images/${a.image}" class="artwork-photo" loading="lazy">` : ""}
+  <h3 class="artwork-name">${a.name}</h3>
+  <p class="artwork-desc">${a.description}</p>
+</div>`;
+}
+
 // ============================================================
 // ADMIN
 // ============================================================
@@ -440,6 +476,7 @@ function adminLayout(title, body) {
   <nav class="nav admin-nav">
     <a href="/admin/drinks" class="nav-link${title.includes("Drinks") ? " active" : ""}">Manage Drinks</a>
     <a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>
+    <a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>
     <a href="/admin/site" class="nav-link${title.includes("Site") ? " active" : ""}">Site</a>
     <a href="/" class="nav-link">View Site</a>
     <form action="/admin/logout" method="post" style="display:inline">
@@ -888,11 +925,156 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
 </div>`);
 }));
 
+// --- Art CRUD ---
+
+app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
+  const artworks = await loadArtworks();
+  res.send(
+    adminLayout(
+      "Admin — Art",
+      `
+<h1 class="page-title">Art</h1>
+<div id="artwork-admin-list">
+  ${adminArtworkList(artworks)}
+</div>
+<div class="admin-add-form">
+  <h2>Add Artwork</h2>
+  <form hx-post="/admin/art" hx-target="#artwork-admin-list" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
+    <input name="name" placeholder="Name" class="input" required>
+    <input name="description" placeholder="Description" class="input" style="flex:2;min-width:200px">
+    <input type="file" name="image" accept="image/*" class="input">
+    <input type="hidden" name="id" value="0">
+    <button class="btn">Add</button>
+  </form>
+</div>`
+    )
+  );
+}));
+
+app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+  const artworks = await loadArtworks();
+  const { id, name, description } = req.body;
+
+  const existing = +id > 0 ? artworks.find((a) => a.id === +id) : null;
+
+  if (existing) {
+    if (req.file) {
+      await removeImage(existing.image);
+      existing.image = await saveUploadedImage(req.file);
+    }
+    Object.assign(existing, { name, description });
+  } else {
+    const newId = artworks.length ? Math.max(...artworks.map((a) => a.id)) + 1 : 1;
+    const image = await saveUploadedImage(req.file);
+    artworks.push({ id: newId, name, description, image });
+  }
+
+  await saveArtworks(artworks);
+  res.send(adminArtworkList(artworks));
+}));
+
+app.delete("/admin/art/:id", requireAdmin, asyncHandler(async (req, res) => {
+  let artworks = await loadArtworks();
+  const artwork = artworks.find((a) => a.id === +req.params.id);
+  if (artwork) await removeImage(artwork.image);
+  artworks = artworks.filter((a) => a.id !== +req.params.id);
+  await saveArtworks(artworks);
+  res.send(adminArtworkList(artworks));
+}));
+
+function adminArtworkList(artworks) {
+  return artworks
+    .map(
+      (a) => `
+<div class="admin-row" id="artwork-${a.id}">
+  <div class="admin-row-info">
+    ${a.image ? `<img src="/images/${a.image}" class="admin-thumb">` : ""}
+    <span class="admin-row-name">${a.name}</span>
+    <span class="muted">${a.description}</span>
+  </div>
+  <div class="admin-row-actions">
+    <button class="btn btn-sm"
+      hx-get="/admin/art/edit/${a.id}"
+      hx-target="#artwork-${a.id}"
+      hx-swap="outerHTML">Edit</button>
+    <button class="btn btn-sm btn-danger"
+      hx-delete="/admin/art/${a.id}"
+      hx-target="#artwork-admin-list"
+      hx-swap="innerHTML"
+      hx-confirm="Delete ${a.name}?">Delete</button>
+  </div>
+</div>`
+    )
+    .join("\n");
+}
+
+app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const artworks = await loadArtworks();
+  const a = artworks.find((a) => a.id === +req.params.id);
+  if (!a) return res.status(404).send("Not found");
+  res.send(`
+<div class="admin-row admin-row-edit" id="artwork-${a.id}">
+  <form hx-post="/admin/art" hx-target="#artwork-admin-list" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data"
+        style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;width:100%">
+    <input type="hidden" name="id" value="${a.id}">
+    <input name="name" value="${a.name}" class="input" style="flex:1;min-width:150px">
+    <input name="description" value="${a.description}" class="input" style="flex:2;min-width:200px">
+    <input type="file" name="image" accept="image/*" class="input">
+    ${a.image ? `<span class="muted" style="font-size:0.7rem">Current: ${a.image}</span>` : ""}
+    <button class="btn btn-sm">Save</button>
+    <button type="button" class="btn btn-sm btn-ghost"
+      hx-get="/admin/art/cancel/${a.id}"
+      hx-target="#artwork-${a.id}"
+      hx-swap="outerHTML">Cancel</button>
+  </form>
+</div>`);
+}));
+
+app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+  const artworks = await loadArtworks();
+  const a = artworks.find((a) => a.id === +req.params.id);
+  if (!a) return res.send("");
+  res.send(`
+<div class="admin-row" id="artwork-${a.id}">
+  <div class="admin-row-info">
+    ${a.image ? `<img src="/images/${a.image}" class="admin-thumb">` : ""}
+    <span class="admin-row-name">${a.name}</span>
+    <span class="muted">${a.description}</span>
+  </div>
+  <div class="admin-row-actions">
+    <button class="btn btn-sm"
+      hx-get="/admin/art/edit/${a.id}"
+      hx-target="#artwork-${a.id}"
+      hx-swap="outerHTML">Edit</button>
+    <button class="btn btn-sm btn-danger"
+      hx-delete="/admin/art/${a.id}"
+      hx-target="#artwork-admin-list"
+      hx-swap="innerHTML"
+      hx-confirm="Delete ${a.name}?">Delete</button>
+  </div>
+</div>`);
+}));
+
 // --- Helpers ---
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// --- Error handler ---
+
+app.use((err, _req, res, _next) => {
+  console.error("ompu error:", err);
+  const status = err.status || err.statusCode || 500;
+  const message = status === 500 ? "Internal server error" : String(err.message || err);
+  if (status === 500) {
+    res.status(500).send(`<p class="muted" style="text-align:center;padding:2rem">${message}</p>`);
+    return;
+  }
+  res.status(status).send(message);
+});
 
 // --- Start ---
 
