@@ -363,7 +363,7 @@ function drinkCards(drinks) {
 <div class="drink-item reveal">
   ${d.image ? `<img src="/images/${d.image}" class="drink-photo">` : ""}
   <h3 class="drink-name">${d.name}</h3>
-  <span class="drink-price" data-price="${d.price}">€${d.price}</span>
+  ${d.price != null ? `<span class="drink-price" data-price="${d.price}">€${d.price}</span>` : ""}
   <p class="drink-desc">${d.description}</p>
 </div>`
     )
@@ -537,13 +537,9 @@ app.post("/admin/logout", (req, res) => {
 
 // --- Site settings ---
 
-app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
-  const site = await loadSite();
+function sitePageBody(site) {
   const currentContent = site.home_content || DEFAULT_HOME_CONTENT;
-  res.send(
-    adminLayout(
-      "Admin — Site",
-      `
+  return `
 <h1 class="page-title">Site</h1>
 <div class="admin-add-form">
   <h2>Hero Image</h2>
@@ -591,9 +587,12 @@ app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
       </div>
     </div>
   </form>
-</div>`
-    )
-  );
+</div>`;
+}
+
+app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
+  const site = await loadSite();
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
 
 app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
@@ -603,7 +602,7 @@ app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async
     site.hero_image = await saveUploadedImage(req.file);
     await saveSite(site);
   }
-  res.redirect("/admin/site");
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
 
 app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) => {
@@ -611,7 +610,7 @@ app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) 
   await removeImage(site.hero_image);
   site.hero_image = "";
   await saveSite(site);
-  res.redirect("/admin/site");
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
 
 app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
@@ -619,14 +618,14 @@ app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
   site.hero_tagline = (req.body.hero_tagline || "").trim();
   site.hero_opening_hours = (req.body.hero_opening_hours || "").trim();
   await saveSite(site);
-  res.redirect("/admin/site");
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
 
 app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
   const site = await loadSite();
   site.home_content = (req.body.home_content || "").trim();
   await saveSite(site);
-  res.redirect("/admin/site");
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
 
 // --- Drink CRUD ---
@@ -652,7 +651,7 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
       <option value="wine">Wine</option>
     </select>
     <input name="description" placeholder="Description" class="input">
-    <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input" required>
+    <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input">
     <input type="file" name="image" accept="image/*" class="input">
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
@@ -673,16 +672,18 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
       await removeImage(existing.image);
       existing.image = await saveUploadedImage(req.file);
     }
-    Object.assign(existing, { name, category, description, price: +price });
-  } else {
-    const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
-    const image = await saveUploadedImage(req.file);
-    drinks.push({
-      id: newId, name, category, description, price: +price,
-      image,
-    });
+    Object.assign(existing, { name, category, description, price: price ? +price : null });
+    await saveDrinks(drinks);
+    res.send(adminDrinkRow(existing));
+    return;
   }
 
+  const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
+  const image = await saveUploadedImage(req.file);
+  drinks.push({
+    id: newId, name, category, description, price: price ? +price : null,
+    image,
+  });
   await saveDrinks(drinks);
   res.send(adminDrinkList(drinks));
 }));
@@ -697,16 +698,18 @@ app.delete("/admin/drinks/:id", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 function adminDrinkList(drinks) {
-  return drinks
-    .map(
-      (d) => `
+  return drinks.map(adminDrinkRow).join("\n");
+}
+
+function adminDrinkRow(d) {
+  return `
 <div class="admin-row" id="drink-${d.id}">
   <div class="admin-row-info">
     ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
     <span class="admin-row-name">${d.name}</span>
     <span class="tag">${d.category}</span>
     <span class="muted">${d.description}</span>
-    <span>€${d.price}</span>
+    ${d.price != null ? `<span>€${d.price}</span>` : ""}
   </div>
   <div class="admin-row-actions">
     <button class="btn btn-sm"
@@ -719,9 +722,7 @@ function adminDrinkList(drinks) {
       hx-swap="innerHTML"
       hx-confirm="Delete ${d.name}?">Delete</button>
   </div>
-</div>`
-    )
-    .join("\n");
+</div>`;
 }
 
 app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
@@ -730,7 +731,7 @@ app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) =>
   if (!d) return res.status(404).send("Not found");
   res.send(`
 <div class="admin-row admin-row-edit" id="drink-${d.id}">
-  <form hx-post="/admin/drinks" hx-target="#drink-admin-list" hx-swap="innerHTML"
+  <form hx-post="/admin/drinks" hx-target="#drink-${d.id}" hx-swap="outerHTML"
         hx-encoding="multipart/form-data"
         style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;width:100%">
     <input type="hidden" name="id" value="${d.id}">
@@ -757,27 +758,7 @@ app.get("/admin/drinks/cancel/:id", requireAdmin, asyncHandler(async (req, res) 
   const drinks = await loadDrinks();
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
-  res.send(`
-<div class="admin-row" id="drink-${d.id}">
-  <div class="admin-row-info">
-    ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
-    <span class="admin-row-name">${d.name}</span>
-    <span class="tag">${d.category}</span>
-    <span class="muted">${d.description}</span>
-    <span>€${d.price}</span>
-  </div>
-  <div class="admin-row-actions">
-    <button class="btn btn-sm"
-      hx-get="/admin/drinks/edit/${d.id}"
-      hx-target="#drink-${d.id}"
-      hx-swap="outerHTML">Edit</button>
-    <button class="btn btn-sm btn-danger"
-      hx-delete="/admin/drinks/${d.id}"
-      hx-target="#drink-admin-list"
-      hx-swap="innerHTML"
-      hx-confirm="Delete ${d.name}?">Delete</button>
-  </div>
-</div>`);
+  res.send(adminDrinkRow(d));
 }));
 
 // --- DJ CRUD ---
@@ -835,15 +816,17 @@ app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async 
       existing.image = await saveUploadedImage(req.file);
     }
     Object.assign(existing, { name, genre, date: parsedDate, time, bio });
-  } else {
-    const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
-    const image = await saveUploadedImage(req.file);
-    djs.push({
-      id: newId, name, genre, date: parsedDate, time, bio,
-      image,
-    });
+    await saveDJs(djs);
+    res.send(adminDJRow(existing));
+    return;
   }
 
+  const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
+  const image = await saveUploadedImage(req.file);
+  djs.push({
+    id: newId, name, genre, date: parsedDate, time, bio,
+    image,
+  });
   await saveDJs(djs);
   res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
 }));
@@ -858,9 +841,11 @@ app.delete("/admin/djs/:id", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 function adminDJList(djs) {
-  return djs
-    .map(
-      (d) => `
+  return djs.map(adminDJRow).join("\n");
+}
+
+function adminDJRow(d) {
+  return `
 <div class="admin-row" id="dj-${d.id}">
   <div class="admin-row-info">
     ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
@@ -880,9 +865,7 @@ function adminDJList(djs) {
       hx-swap="innerHTML"
       hx-confirm="Delete ${d.name}?">Delete</button>
   </div>
-</div>`
-    )
-    .join("\n");
+</div>`;
 }
 
 app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
@@ -891,7 +874,7 @@ app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
   if (!d) return res.status(404).send("Not found");
   res.send(`
 <div class="admin-row admin-row-edit" id="dj-${d.id}">
-  <form hx-post="/admin/djs" hx-target="#dj-admin-list" hx-swap="innerHTML"
+  <form hx-post="/admin/djs" hx-target="#dj-${d.id}" hx-swap="outerHTML"
         hx-encoding="multipart/form-data"
         style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;width:100%">
     <input type="hidden" name="id" value="${d.id}">
@@ -915,27 +898,7 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   const djs = await loadDJs();
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
-  res.send(`
-<div class="admin-row" id="dj-${d.id}">
-  <div class="admin-row-info">
-    ${d.image ? `<img src="/images/${d.image}" class="admin-thumb">` : ""}
-    <span class="admin-row-name">${d.name}</span>
-    <span class="tag">${d.genre}</span>
-    <span class="muted">${formatEUDate(d.date)} ${d.time}</span>
-    <span>${d.bio}</span>
-  </div>
-  <div class="admin-row-actions">
-    <button class="btn btn-sm"
-      hx-get="/admin/djs/edit/${d.id}"
-      hx-target="#dj-${d.id}"
-      hx-swap="outerHTML">Edit</button>
-    <button class="btn btn-sm btn-danger"
-      hx-delete="/admin/djs/${d.id}"
-      hx-target="#dj-admin-list"
-      hx-swap="innerHTML"
-      hx-confirm="Delete ${d.name}?">Delete</button>
-  </div>
-</div>`);
+  res.send(adminDJRow(d));
 }));
 
 // --- Art CRUD ---
@@ -977,12 +940,14 @@ app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async 
       existing.image = await saveUploadedImage(req.file);
     }
     Object.assign(existing, { name, description });
-  } else {
-    const newId = artworks.length ? Math.max(...artworks.map((a) => a.id)) + 1 : 1;
-    const image = await saveUploadedImage(req.file);
-    artworks.push({ id: newId, name, description, image });
+    await saveArtworks(artworks);
+    res.send(adminArtworkRow(existing));
+    return;
   }
 
+  const newId = artworks.length ? Math.max(...artworks.map((a) => a.id)) + 1 : 1;
+  const image = await saveUploadedImage(req.file);
+  artworks.push({ id: newId, name, description, image });
   await saveArtworks(artworks);
   res.send(adminArtworkList(artworks));
 }));
@@ -997,9 +962,11 @@ app.delete("/admin/art/:id", requireAdmin, asyncHandler(async (req, res) => {
 }));
 
 function adminArtworkList(artworks) {
-  return artworks
-    .map(
-      (a) => `
+  return artworks.map(adminArtworkRow).join("\n");
+}
+
+function adminArtworkRow(a) {
+  return `
 <div class="admin-row" id="artwork-${a.id}">
   <div class="admin-row-info">
     ${a.image ? `<img src="/images/${a.image}" class="admin-thumb">` : ""}
@@ -1017,9 +984,7 @@ function adminArtworkList(artworks) {
       hx-swap="innerHTML"
       hx-confirm="Delete ${a.name}?">Delete</button>
   </div>
-</div>`
-    )
-    .join("\n");
+</div>`;
 }
 
 app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
@@ -1028,7 +993,7 @@ app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
   if (!a) return res.status(404).send("Not found");
   res.send(`
 <div class="admin-row admin-row-edit" id="artwork-${a.id}">
-  <form hx-post="/admin/art" hx-target="#artwork-admin-list" hx-swap="innerHTML"
+  <form hx-post="/admin/art" hx-target="#artwork-${a.id}" hx-swap="outerHTML"
         hx-encoding="multipart/form-data"
         style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;width:100%">
     <input type="hidden" name="id" value="${a.id}">
@@ -1049,25 +1014,7 @@ app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
   const artworks = await loadArtworks();
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
-  res.send(`
-<div class="admin-row" id="artwork-${a.id}">
-  <div class="admin-row-info">
-    ${a.image ? `<img src="/images/${a.image}" class="admin-thumb">` : ""}
-    <span class="admin-row-name">${a.name}</span>
-    <span class="muted">${a.description}</span>
-  </div>
-  <div class="admin-row-actions">
-    <button class="btn btn-sm"
-      hx-get="/admin/art/edit/${a.id}"
-      hx-target="#artwork-${a.id}"
-      hx-swap="outerHTML">Edit</button>
-    <button class="btn btn-sm btn-danger"
-      hx-delete="/admin/art/${a.id}"
-      hx-target="#artwork-admin-list"
-      hx-swap="innerHTML"
-      hx-confirm="Delete ${a.name}?">Delete</button>
-  </div>
-</div>`);
+  res.send(adminArtworkRow(a));
 }));
 
 // --- Helpers ---
