@@ -72,7 +72,7 @@ describe("Public pages", () => {
   it("GET /drinks returns full drinks page", async () => {
     const { status, text } = await fetch("/drinks");
     assert.equal(status, 200);
-    assert.match(text, /Ompu Old Fashioned/);
+    assert.match(text, /Draft IPA/);
     assert.match(text, /Cocktails/);
     assert.match(text, /drink-item/);
   });

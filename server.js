@@ -7,7 +7,7 @@ const { getStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const IS_NETLIFY = process.env.NETLIFY === "true";
+const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY === "true";
 const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";

@@ -42,7 +42,6 @@ This repo includes `netlify.toml` and a Netlify Function wrapper for the Express
 2. Set environment variables in Netlify:
 
 ```bash
-NETLIFY=true
 ADMIN_PASSWORD=your-admin-password
 SESSION_SECRET=use-a-long-random-string
 ```
