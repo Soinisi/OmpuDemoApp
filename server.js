@@ -448,11 +448,14 @@ app.get("/art", asyncHandler(async (_req, res) => {
   <p class="page-subtitle">Work exhibited inside the room. Rotating monthly.</p>
 </div>
 ${artists.length ? artistsSection(artists) : ""}
-<div class="artwork-list">
+<section class="section reveal">
+  <h2 class="section-title">Artworks</h2>
+  <div class="artwork-list">
 ${artworks.length
   ? artworks.map(artworkCard).join("\n")
   : '<p class="empty">No artworks yet.</p>'}
-</div>`
+  </div>
+</section>`
     )
   );
 }));
