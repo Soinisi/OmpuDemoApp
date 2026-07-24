@@ -10,9 +10,11 @@ const TEST_PW = "test-password";
 const drinksPath = path.join(__dirname, "..", "data", "drinks.json");
 const djsPath = path.join(__dirname, "..", "data", "djs.json");
 const sitePath = path.join(__dirname, "..", "data", "site.json");
+const artworksPath = path.join(__dirname, "..", "data", "artworks.json");
 const drinksBackup = fs.readFileSync(drinksPath, "utf-8");
 const djsBackup = fs.readFileSync(djsPath, "utf-8");
 const siteBackup = fs.readFileSync(sitePath, "utf-8");
+const artworksBackup = fs.readFileSync(artworksPath, "utf-8");
 
 process.env.ADMIN_PASSWORD = TEST_PW;
 const app = require("../server");
@@ -34,6 +36,7 @@ after(() => {
   fs.writeFileSync(drinksPath, drinksBackup);
   fs.writeFileSync(djsPath, djsBackup);
   fs.writeFileSync(sitePath, siteBackup);
+  fs.writeFileSync(artworksPath, artworksBackup);
   delete process.env.ADMIN_PASSWORD;
 });
 
@@ -102,6 +105,15 @@ describe("Public pages", () => {
     assert.match(text, /DJ Solstice/);
     assert.match(text, /MIRA/);
     assert.match(text, /dj-item/);
+  });
+
+  it("GET /art returns art page with artworks", async () => {
+    const { status, text } = await fetch("/art");
+    assert.equal(status, 200);
+    assert.match(text, /Emerge/);
+    assert.match(text, /Low Light Series/);
+    assert.match(text, /Concrete Garden/);
+    assert.match(text, /artwork-item/);
   });
 });
 
@@ -314,6 +326,104 @@ describe("Admin DJ CRUD", () => {
     });
     const text = await res.text();
     assert.doesNotMatch(text, /Test DJ/);
+  });
+});
+
+// --- Admin Art CRUD ---
+
+describe("Admin Art CRUD", () => {
+  let adminCookie;
+
+  before(async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + TEST_PW,
+      redirect: "manual",
+    });
+    adminCookie = res.headers.get("set-cookie");
+  });
+
+  it("artwork list shows all artworks", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Emerge/);
+    assert.match(text, /Low Light Series/);
+    assert.match(text, /Manage Art/);
+  });
+
+  it("adds a new artwork", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: "id=0&name=Test+Artwork&description=Test+desc",
+    });
+    const text = await res.text();
+    assert.match(text, /Test Artwork/);
+    assert.match(text, /Test desc/);
+  });
+
+  it("edits an existing artwork", async () => {
+    const listRes = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: adminCookie },
+    });
+    const listText = await listRes.text();
+    const id = findRowId(listText, "artwork", "Test Artwork");
+    assert.ok(id, "Could not find Test Artwork's id");
+
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: `id=${id}&name=Test+Artwork+Edited&description=Updated+desc`,
+    });
+    const text = await res.text();
+    assert.match(text, /Test Artwork Edited/);
+    assert.match(text, /Updated desc/);
+  });
+
+  it("deletes an artwork", async () => {
+    const listRes = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: adminCookie },
+    });
+    const listText = await listRes.text();
+    const id = findRowId(listText, "artwork", "Test Artwork Edited");
+    assert.ok(id, "Could not find Test Artwork Edited's id");
+
+    const res = await globalThis.fetch(baseURL + "/admin/art/" + id, {
+      method: "DELETE",
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.doesNotMatch(text, /Test Artwork Edited/);
+  });
+
+  it("edit endpoint returns edit form", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art/edit/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Emerge/);
+    assert.match(text, /Save/);
+    assert.match(text, /Cancel/);
+    assert.match(text, /admin-row-edit/);
+  });
+
+  it("cancel endpoint returns display row", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art/cancel/1", {
+      headers: { cookie: adminCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Emerge/);
+    assert.match(text, /Edit/);
+    assert.match(text, /Delete/);
   });
 });
 
