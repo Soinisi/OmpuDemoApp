@@ -894,6 +894,19 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// --- Error handler ---
+
+app.use((err, _req, res, _next) => {
+  console.error("ompu error:", err);
+  const status = err.status || err.statusCode || 500;
+  const message = status === 500 ? "Internal server error" : String(err.message || err);
+  if (status === 500) {
+    res.status(500).send(`<p class="muted" style="text-align:center;padding:2rem">${message}</p>`);
+    return;
+  }
+  res.status(status).send(message);
+});
+
 // --- Start ---
 
 if (require.main === module) {
