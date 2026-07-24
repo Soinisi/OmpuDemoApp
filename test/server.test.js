@@ -82,8 +82,8 @@ describe("Public pages", () => {
     assert.match(text, /drink-group-title/);
   });
 
-  it("GET /drinks?tab=2 returns cocktails fragment", async () => {
-    const { status, text } = await fetch("/drinks?tab=2");
+  it("GET /drinks?tab=3 returns cocktails fragment", async () => {
+    const { status, text } = await fetch("/drinks?tab=3");
     assert.equal(status, 200);
     assert.match(text, /Ompu Old Fashioned/);
     assert.match(text, /Espresso Martini/);

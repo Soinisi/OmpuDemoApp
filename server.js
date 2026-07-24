@@ -326,8 +326,8 @@ app.get("/drinks", asyncHandler(async (req, res) => {
   const tabs = [
     { label: "Beer, Cider &amp; Others", cats: ["beer", "cider", "others"] },
     { label: "Wine", cats: ["wine"] },
-    { label: "Cocktails", cats: ["cocktails"] },
     { label: "Hard Spirits", cats: ["spirits"] },
+    { label: "Cocktails", cats: ["cocktails"] },
   ];
   const visible = tabs.filter((t) => t.cats.some((c) => drinks.some((d) => d.category === c)));
   const tabIdx = parseInt(req.query.tab) || 0;
