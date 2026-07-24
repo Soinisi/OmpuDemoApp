@@ -60,4 +60,4 @@ Uses Node's built-in test runner. 20 tests cover all public pages and admin CRUD
 
 ## Tech
 
-Express, express-session, multer, htmx (CDN), vanilla CSS, ~50 lines vanilla JS.
+Express, multer, htmx (CDN), vanilla CSS, ~50 lines vanilla JS.

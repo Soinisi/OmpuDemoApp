@@ -576,7 +576,7 @@ function sitePageBody(site) {
     <button class="btn">Upload</button>
   </form>
   ${site.hero_image ? `
-  <form hx-post="/admin/site/remove-hero" style="margin-top:0.5rem">
+  <form hx-post="/admin/site/remove-hero" hx-target="body" hx-swap="innerHTML" style="margin-top:0.5rem">
     <button class="btn btn-danger btn-sm">Remove</button>
   </form>` : ""}
 </div>
