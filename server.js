@@ -938,6 +938,8 @@ app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
       "Admin — Art",
       `
 <h1 class="page-title">Art</h1>
+
+<h2 class="section-title">Artists</h2>
 <div id="artist-admin-list">
   ${adminArtistList(artists)}
 </div>
@@ -952,6 +954,8 @@ app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
     <button class="btn">Add</button>
   </form>
 </div>
+
+<h2 class="section-title">Artworks</h2>
 <div id="artwork-admin-list">
   ${adminArtworkList(artworks)}
 </div>
