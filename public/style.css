@@ -316,11 +316,12 @@ a:hover { color: var(--orange-warm); }
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding-top: 1.5rem;
+  margin-top: 1rem;
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--divider);
 }
 
-.drink-group-title:first-child { padding-top: 0; }
+.drink-group:first-child .drink-group-title { padding-top: 0; margin-top: 0; }
 
 /* ==============================
    DJ list (poster/flyer feel)
