@@ -375,7 +375,7 @@ function groupedDrinkCards(drinks, cats) {
     .map((cat) => {
       const items = drinks.filter((d) => d.category === cat);
       if (!items.length) return "";
-      const label = cat === "others" ? "Seltzers &amp; Others" : capitalize(cat);
+      const label = cat === "others" ? "Others" : capitalize(cat);
       return `
 <div class="drink-group">
   <h3 class="drink-group-title">${label}</h3>
@@ -683,7 +683,7 @@ function categoryDropdown(selected) {
   const opts = [
     ["beer", "Beer"],
     ["cider", "Cider"],
-    ["others", "Seltzers &amp; Others"],
+    ["others", "Others"],
     ["wine", "Wine"],
     ["cocktails", "Cocktails"],
     ["spirits", "Hard Spirits"],
