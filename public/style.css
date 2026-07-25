@@ -315,7 +315,7 @@ a:hover { color: var(--orange-warm); }
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding-top: 2.5rem;
+  padding-top: 1.5rem;
   margin-bottom: 0.5rem;
   border-bottom: 1px solid var(--divider);
 }
