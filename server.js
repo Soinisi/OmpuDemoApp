@@ -323,12 +323,20 @@ ${bodyContent}`
 
 app.get("/drinks", asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
-  const allCats = ["beer", "wine", "cocktails"];
-  const categories = allCats.filter((c) => drinks.some((d) => d.category === c));
-  const selectedCat = req.query.cat || categories[0];
+  const tabs = [
+    { label: "Beer, Cider &amp; Others", cats: ["beer", "cider", "others"] },
+    { label: "Wine", cats: ["wine"] },
+    { label: "Hard Spirits", cats: ["spirits"] },
+    { label: "Cocktails", cats: ["cocktails"] },
+  ];
+  const visible = tabs.filter((t) => t.cats.some((c) => drinks.some((d) => d.category === c)));
+  const tabIdx = parseInt(req.query.tab) || 0;
+  if (tabIdx < 0 || tabIdx >= visible.length) return res.status(404).send("");
+  const activeTab = visible[tabIdx];
+  const filtered = drinks.filter((d) => activeTab.cats.includes(d.category));
 
-  if (req.query.cat) {
-    return res.send(drinkCards(drinks.filter((d) => d.category === selectedCat)));
+  if ("tab" in req.query) {
+    return res.send(groupedDrinkCards(filtered, activeTab.cats));
   }
 
   res.send(
@@ -340,15 +348,15 @@ app.get("/drinks", asyncHandler(async (req, res) => {
   <p class="page-subtitle">Crafted. No shortcuts.</p>
 </div>
 <div class="tabs" role="tablist">
-  ${categories
+  ${visible
     .map(
-      (cat, i) =>
+      (t, i) =>
         `<button class="tab${i === 0 ? " active" : ""}"
-          hx-get="/drinks?cat=${cat}"
+          hx-get="/drinks?tab=${i}"
           hx-target="#drink-list"
           hx-swap="innerHTML"
           hx-indicator="#drink-loading"
-          onclick="document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">${capitalize(cat)}</button>`
+          onclick="document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">${t.label}</button>`
     )
     .join("\n  ")}
 </div>
@@ -356,24 +364,35 @@ app.get("/drinks", asyncHandler(async (req, res) => {
   <div class="spinner"></div>
 </div>
 <div id="drink-list">
-  ${drinkCards(drinks.filter((d) => d.category === selectedCat))}
+  ${groupedDrinkCards(filtered, activeTab.cats)}
 </div>`
     )
   );
 }));
 
-function drinkCards(drinks) {
-  return drinks
-    .map(
-      (d) => `
+function groupedDrinkCards(drinks, cats) {
+  return cats
+    .map((cat) => {
+      const items = drinks.filter((d) => d.category === cat);
+      if (!items.length) return "";
+      const label = cat === "others" ? "Others" : capitalize(cat);
+      return `
+<div class="drink-group">
+  <h3 class="drink-group-title">${label}</h3>
+  ${items.map(drinkCard).join("\n  ")}
+</div>`;
+    })
+    .join("\n");
+}
+
+function drinkCard(d) {
+  return `
 <div class="drink-item reveal">
   ${d.image ? `<img src="/images/${d.image}" class="drink-photo">` : ""}
   <h3 class="drink-name">${d.name}</h3>
   ${d.price != null ? `<span class="drink-price" data-price="${d.price}">€${d.price}</span>` : ""}
   <p class="drink-desc">${d.description}</p>
-</div>`
-    )
-    .join("\n");
+</div>`;
 }
 
 app.get("/djs", asyncHandler(async (_req, res) => {
@@ -660,6 +679,23 @@ app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
 
 // --- Drink CRUD ---
 
+function categoryDropdown(selected) {
+  const opts = [
+    ["beer", "Beer"],
+    ["cider", "Cider"],
+    ["others", "Others"],
+    ["wine", "Wine"],
+    ["cocktails", "Cocktails"],
+    ["spirits", "Hard Spirits"],
+  ];
+  return opts
+    .map(
+      ([val, label]) =>
+        `<option value="${val}"${selected === val ? " selected" : ""}>${label}</option>`
+    )
+    .join("\n          ");
+}
+
 app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
   const drinks = await loadDrinks();
   res.send(
@@ -676,10 +712,8 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
         hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
     <input name="name" placeholder="Name" class="input" required>
     <select name="category" class="input">
-      <option value="cocktails">Cocktails</option>
-      <option value="beer">Beer</option>
-      <option value="wine">Wine</option>
-    </select>
+          ${categoryDropdown("cocktails")}
+        </select>
     <input name="description" placeholder="Description" class="input">
     <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input">
     <input type="file" name="image" accept="image/*" class="input">
@@ -767,10 +801,8 @@ app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) =>
     <input type="hidden" name="id" value="${d.id}">
     <input name="name" value="${d.name}" class="input" style="flex:1;min-width:120px">
     <select name="category" class="input">
-      <option value="cocktails" ${d.category === "cocktails" ? "selected" : ""}>Cocktails</option>
-      <option value="beer" ${d.category === "beer" ? "selected" : ""}>Beer</option>
-      <option value="wine" ${d.category === "wine" ? "selected" : ""}>Wine</option>
-    </select>
+          ${categoryDropdown(d.category)}
+        </select>
     <input name="description" value="${d.description}" class="input" style="flex:2;min-width:150px">
     <input name="price" type="number" step="0.5" value="${d.price}" class="input" style="width:80px">
     <input type="file" name="image" accept="image/*" class="input">
