@@ -32,7 +32,10 @@ function animatePrices() {
       current = target * eased;
       el.textContent = "€" + (current % 1 === 0 ? current : current.toFixed(1)).replace(".", ",");
       if (progress < 1) requestAnimationFrame(step);
-      else el.textContent = "€" + String(target).replace(".", ",");
+      else {
+        const s = String(target);
+        el.textContent = "€" + (s.includes(".") ? s.replace(".", ",") : s);
+      }
     }
 
     requestAnimationFrame(step);

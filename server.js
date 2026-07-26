@@ -18,7 +18,8 @@ function getDataStore() {
   if (!USE_BLOBS) return getStore("ompu-data");
   if (process.env.IS_PRODUCTION === "false") {
     try {
-      return getDeployStore("ompu-data");
+      const opts = process.env.BLOBS_REGION ? { region: process.env.BLOBS_REGION } : {};
+      return getDeployStore("ompu-data", opts);
     } catch (e) {
       console.error("ompu: deploy data store unavailable:", e.message);
       return null;
@@ -30,7 +31,8 @@ function getImageStore() {
   if (!USE_BLOBS) return getStore("ompu-images");
   if (process.env.IS_PRODUCTION === "false") {
     try {
-      return getDeployStore("ompu-images");
+      const opts = process.env.BLOBS_REGION ? { region: process.env.BLOBS_REGION } : {};
+      return getDeployStore("ompu-images", opts);
     } catch (e) {
       console.error("ompu: deploy image store unavailable:", e.message);
       return null;
@@ -42,7 +44,8 @@ function getBackupStore() {
   if (!USE_BLOBS) return getStore("ompu-backups");
   if (process.env.IS_PRODUCTION === "false") {
     try {
-      return getDeployStore("ompu-backups");
+      const opts = process.env.BLOBS_REGION ? { region: process.env.BLOBS_REGION } : {};
+      return getDeployStore("ompu-backups", opts);
     } catch (e) {
       console.error("ompu: deploy backup store unavailable:", e.message);
       return null;
@@ -84,8 +87,10 @@ function parsePrice(val) {
 
 function formatPrice(val) {
   if (val == null) return "";
-  const fixed = Math.round(val * 100) / 100;
-  return String(fixed).replace(".", ",");
+  const num = Number(val);
+  if (isNaN(num)) return "";
+  const str = String(Math.round(num * 100) / 100);
+  return str.includes(".") ? str.replace(".", ",") : str;
 }
 
 function asyncHandler(fn) {
