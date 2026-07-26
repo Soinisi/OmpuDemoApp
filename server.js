@@ -76,6 +76,18 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
+function parsePrice(val) {
+  if (!val && val !== 0) return null;
+  const num = parseFloat(String(val).replace(",", "."));
+  return isNaN(num) ? null : num;
+}
+
+function formatPrice(val) {
+  if (val == null) return "";
+  const fixed = Math.round(val * 100) / 100;
+  return String(fixed).replace(".", ",");
+}
+
 function asyncHandler(fn) {
   return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 }
@@ -458,7 +470,7 @@ function drinkCard(d) {
 <div class="drink-item reveal">
   ${d.image ? `<img src="/images/${d.image}" class="drink-photo">` : ""}
   <h3 class="drink-name">${d.name}</h3>
-  ${d.price != null ? `<span class="drink-price" data-price="${d.price}">€${d.price}</span>` : ""}
+  ${d.price != null ? `<span class="drink-price" data-price="${d.price}">€${formatPrice(d.price)}</span>` : ""}
   <p class="drink-desc">${d.description}</p>
 </div>`;
 }
@@ -859,7 +871,7 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
           ${categoryDropdown("cocktails")}
         </select>
     <input name="description" placeholder="Description" class="input">
-    <input name="price" type="number" step="0.5" placeholder="Price (€)" class="input">
+    <input name="price" type="text" placeholder="Price (€)" class="input">
     <input type="file" name="image" accept="image/*" class="input">
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
@@ -880,7 +892,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
       await removeImage(existing.image);
       existing.image = await saveUploadedImage(req.file);
     }
-    Object.assign(existing, { name, category, description, price: price ? +price : null });
+    Object.assign(existing, { name, category, description, price: parsePrice(price) });
     await saveDrinks(drinks);
     res.send(adminDrinkRow(existing));
     return;
@@ -889,7 +901,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
   const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
   const image = await saveUploadedImage(req.file);
   drinks.push({
-    id: newId, name, category, description, price: price ? +price : null,
+    id: newId, name, category, description, price: parsePrice(price),
     image,
   });
   await saveDrinks(drinks);
@@ -917,7 +929,7 @@ function adminDrinkRow(d) {
     <span class="admin-row-name">${d.name}</span>
     <span class="tag">${d.category}</span>
     <span class="muted">${d.description}</span>
-    ${d.price != null ? `<span>€${d.price}</span>` : ""}
+    ${d.price != null ? `<span>€${formatPrice(d.price)}</span>` : ""}
   </div>
   <div class="admin-row-actions">
     <button class="btn btn-sm"
@@ -948,7 +960,7 @@ app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) =>
           ${categoryDropdown(d.category)}
         </select>
     <input name="description" value="${d.description}" class="input" style="flex:2;min-width:150px">
-    <input name="price" type="number" step="0.5" value="${d.price}" class="input" style="width:80px">
+    <input name="price" type="text" value="${formatPrice(d.price)}" class="input" style="width:80px">
     <input type="file" name="image" accept="image/*" class="input">
     ${d.image ? `<span class="muted" style="font-size:0.7rem">Current: ${d.image}</span>` : ""}
     <button class="btn btn-sm">Save</button>

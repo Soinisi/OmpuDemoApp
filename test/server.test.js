@@ -211,11 +211,11 @@ describe("Admin drink CRUD", () => {
         "content-type": "application/x-www-form-urlencoded",
         cookie: adminCookie,
       },
-      body: "id=0&name=Test+Gin&category=cocktails&description=Test+desc&price=10",
+      body: "id=0&name=Test+Gin&category=cocktails&description=Test+desc&price=10,5",
     });
     const text = await res.text();
     assert.match(text, /Test Gin/);
-    assert.match(text, /€10/);
+    assert.match(text, /€10,5/);
   });
 
   it("edits an existing drink", async () => {
@@ -236,11 +236,11 @@ describe("Admin drink CRUD", () => {
         "content-type": "application/x-www-form-urlencoded",
         cookie: adminCookie,
       },
-      body: `id=${id}&name=Test+Gin+Edited&category=cocktails&description=Updated&price=11`,
+      body: `id=${id}&name=Test+Gin+Edited&category=cocktails&description=Updated&price=11.5`,
     });
     const text = await res.text();
     assert.match(text, /Test Gin Edited/);
-    assert.match(text, /€11/);
+    assert.match(text, /€11,5/);
   });
 
   it("deletes a drink", async () => {
