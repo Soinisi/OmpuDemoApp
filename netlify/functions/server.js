@@ -18,10 +18,6 @@ exports.handler = async (event, context) => {
     process.env.BLOBS_REGION = process.env.AWS_REGION;
   }
 
-  if (event.headers["x-nf-deploy-id"]) {
-    process.env.DEPLOY_ID = event.headers["x-nf-deploy-id"].slice(0, 8);
-  }
-
   connectLambda(event);
   return handler(event, context);
 };
