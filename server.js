@@ -12,6 +12,7 @@ const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";
 const ROOT_DIR = __dirname;
+const ASSET_VERSION = process.env.DEPLOY_ID ? "?v=" + process.env.DEPLOY_ID : "?v=0";
 const USE_BLOBS = IS_NETLIFY || process.env.USE_NETLIFY_BLOBS === "true";
 
 function getDataStore() {
@@ -345,9 +346,9 @@ function layout(title, body) {
   <title>${title} — ompu</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css${ASSET_VERSION}">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-  <script src="/app.js" defer></script>
+  <script src="/app.js${ASSET_VERSION}" defer></script>
 </head>
 <body hx-boost="true" hx-swap="innerHTML transition:true">
   <nav class="nav">
@@ -603,7 +604,7 @@ function adminLayout(title, body) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title} — ompu admin</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css${ASSET_VERSION}">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
 <body>
@@ -631,7 +632,7 @@ app.get("/admin", (_req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — ompu</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css${ASSET_VERSION}">
 </head>
 <body>
   <main class="login-page">
