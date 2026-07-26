@@ -16,7 +16,7 @@ const USE_BLOBS = IS_NETLIFY || process.env.USE_NETLIFY_BLOBS === "true";
 
 function getDataStore() {
   if (!USE_BLOBS) return getStore("ompu-data");
-  if (process.env.USE_DEPLOY_STORE === "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     try {
       return getDeployStore("ompu-data");
     } catch (e) {
@@ -28,7 +28,7 @@ function getDataStore() {
 }
 function getImageStore() {
   if (!USE_BLOBS) return getStore("ompu-images");
-  if (process.env.USE_DEPLOY_STORE === "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     try {
       return getDeployStore("ompu-images");
     } catch (e) {
@@ -40,7 +40,7 @@ function getImageStore() {
 }
 function getBackupStore() {
   if (!USE_BLOBS) return getStore("ompu-backups");
-  if (process.env.USE_DEPLOY_STORE === "true") {
+  if (process.env.IS_PRODUCTION === "false") {
     try {
       return getDeployStore("ompu-backups");
     } catch (e) {

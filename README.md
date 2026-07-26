@@ -49,7 +49,7 @@ ADMIN_PASSWORD=your-admin-password
 SESSION_SECRET=use-a-long-random-string
 ```
 
-Store isolation is handled via `netlify.toml` deploy contexts. Production uses site-wide `getStore` (persistent data across deploys). Deploy previews and branch deploys use `getDeployStore` (isolated, ephemeral data). Context detection is wired through `USE_DEPLOY_STORE` env var set per context in `netlify.toml`.
+Store isolation is automatic: if the request hostname contains `--` (all non-production Netlify URLs), the app uses `getDeployStore` for isolated, ephemeral data. Production uses site-wide `getStore` for persistent data. No configuration needed — detection happens in the function wrapper.
 
 3. Push to GitHub. Netlify installs dependencies and deploys automatically.
 

@@ -9,12 +9,3 @@
   from = "/*"
   to = "/.netlify/functions/server/:splat"
   status = 200
-
-[context.production.environment]
-  USE_DEPLOY_STORE = "false"
-
-[context.deploy-preview.environment]
-  USE_DEPLOY_STORE = "true"
-
-[context.branch-deploy.environment]
-  USE_DEPLOY_STORE = "true"
