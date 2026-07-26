@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
-const { getStore } = require("@netlify/blobs");
+const { getStore, getDeployStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,6 +13,43 @@ const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN
 const ADMIN_COOKIE = "ompu_admin";
 const ROOT_DIR = __dirname;
 const USE_BLOBS = IS_NETLIFY || process.env.USE_NETLIFY_BLOBS === "true";
+
+function getDataStore() {
+  if (!USE_BLOBS) return getStore("ompu-data");
+  if (process.env.IS_PRODUCTION === "false") {
+    try {
+      return getDeployStore("ompu-data");
+    } catch (e) {
+      console.error("ompu: deploy data store unavailable:", e.message);
+      return null;
+    }
+  }
+  return getStore("ompu-data");
+}
+function getImageStore() {
+  if (!USE_BLOBS) return getStore("ompu-images");
+  if (process.env.IS_PRODUCTION === "false") {
+    try {
+      return getDeployStore("ompu-images");
+    } catch (e) {
+      console.error("ompu: deploy image store unavailable:", e.message);
+      return null;
+    }
+  }
+  return getStore("ompu-images");
+}
+function getBackupStore() {
+  if (!USE_BLOBS) return getStore("ompu-backups");
+  if (process.env.IS_PRODUCTION === "false") {
+    try {
+      return getDeployStore("ompu-backups");
+    } catch (e) {
+      console.error("ompu: deploy backup store unavailable:", e.message);
+      return null;
+    }
+  }
+  return getStore("ompu-backups");
+}
 
 function uploadName(file) {
   return Date.now() + "-" + path.basename(file.originalname).replace(/\s+/g, "-");
@@ -129,7 +166,8 @@ function readLocalData(name) {
 async function loadData(name) {
   if (!USE_BLOBS) return readLocalData(name);
 
-  const store = getStore("ompu-data");
+  const store = getDataStore();
+  if (!store) return readLocalData(name);
   const key = `${name}.json`;
   const data = await store.get(key, { type: "json" });
   if (data !== null) return data;
@@ -141,7 +179,9 @@ async function loadData(name) {
 
 async function saveData(name, data) {
   if (USE_BLOBS) {
-    await getStore("ompu-data").setJSON(`${name}.json`, data);
+    const store = getDataStore();
+    if (!store) return;
+    await store.setJSON(`${name}.json`, data);
     return;
   }
 
@@ -178,13 +218,37 @@ function loadSite() {
 function saveSite(data) {
   return saveData("site", data);
 }
+async function snapshotBlobs() {
+  if (!USE_BLOBS) return;
+  const store = getBackupStore();
+  if (!store) return;
+  try {
+    const [drinks, djs, artworks, artists, site] = await Promise.all([
+      loadDrinks(), loadDJs(), loadArtworks(), loadArtists(), loadSite()
+    ]);
+    const bundle = { drinks, djs, artworks, artists, site, timestamp: new Date().toISOString() };
+    const key = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "") + ".json";
+    await store.setJSON(key, bundle);
+
+    const { blobs } = await store.list();
+    if (blobs.length > 50) {
+      const sorted = blobs.map((b) => b.key).sort();
+      const toDelete = sorted.slice(0, sorted.length - 50);
+      await Promise.all(toDelete.map((k) => store.delete(k)));
+    }
+  } catch (e) {
+    console.error("ompu backup snapshot failed:", e);
+  }
+}
 async function saveUploadedImage(file) {
   if (!file) return "";
   if (!USE_BLOBS) return file.filename;
 
   const filename = uploadName(file);
   const body = file.buffer.buffer.slice(file.buffer.byteOffset, file.buffer.byteOffset + file.buffer.byteLength);
-  await getStore("ompu-images").set(filename, body, {
+  const store = getImageStore();
+  if (!store) return filename;
+  await store.set(filename, body, {
     metadata: { contentType: file.mimetype },
   });
   return filename;
@@ -192,7 +256,8 @@ async function saveUploadedImage(file) {
 async function removeImage(filename) {
   if (!filename) return;
   if (USE_BLOBS) {
-    await getStore("ompu-images").delete(filename);
+    const store = getImageStore();
+    if (store) await store.delete(filename);
     return;
   }
 
@@ -202,10 +267,13 @@ async function removeImage(filename) {
 
 app.get("/images/:filename", asyncHandler(async (req, res) => {
   if (USE_BLOBS) {
-    const blob = await getStore("ompu-images").getWithMetadata(req.params.filename, { type: "arrayBuffer" });
-    if (blob) {
-      res.type((blob.metadata && blob.metadata.contentType) || path.extname(req.params.filename));
-      return res.send(Buffer.from(blob.data));
+    const store = getImageStore();
+    if (store) {
+      const blob = await store.getWithMetadata(req.params.filename, { type: "arrayBuffer" });
+      if (blob) {
+        res.type((blob.metadata && blob.metadata.contentType) || path.extname(req.params.filename));
+        return res.send(Buffer.from(blob.data));
+      }
     }
   }
 
@@ -562,7 +630,7 @@ app.get("/admin", (_req, res) => {
 </html>`);
 });
 
-app.post("/admin/login", (req, res) => {
+app.post("/admin/login", asyncHandler(async (req, res) => {
   if (!ADMIN_PW) {
     return res.status(500).send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">ADMIN_PASSWORD is not configured.</p>`);
   }
@@ -574,10 +642,11 @@ app.post("/admin/login", (req, res) => {
       secure: IS_NETLIFY,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     });
+    snapshotBlobs();
     return res.redirect("/admin/drinks");
   }
   res.send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">Wrong password.</p>`);
-});
+}));
 
 app.post("/admin/logout", (req, res) => {
   res.clearCookie(ADMIN_COOKIE);
@@ -636,6 +705,13 @@ function sitePageBody(site) {
       </div>
     </div>
   </form>
+</div>
+<div class="admin-add-form">
+  <h2>Backups</h2>
+  <p class="muted" style="font-size:0.75rem;margin-bottom:0.75rem;line-height:1.5">Auto-snapshot on every login. Last 50 kept.</p>
+  <div hx-get="/admin/backups" hx-trigger="load" hx-swap="innerHTML">
+    <div class="spinner" style="margin:1rem auto"></div>
+  </div>
 </div>`;
 }
 
@@ -675,6 +751,74 @@ app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
   site.home_content = (req.body.home_content || "").trim();
   await saveSite(site);
   res.send(adminLayout("Admin — Site", sitePageBody(site)));
+}));
+
+// --- Backups ---
+
+app.get("/admin/backups", requireAdmin, asyncHandler(async (_req, res) => {
+  if (!USE_BLOBS) return res.send('<p class="muted">No backups in local mode.</p>');
+  const backupStore = getBackupStore();
+  if (!backupStore) return res.send('<p class="muted">Backups unavailable on preview deploys.</p>');
+  const { blobs } = await backupStore.list();
+  const keys = blobs.map((b) => b.key).sort().reverse();
+  if (!keys.length) return res.send('<p class="muted">No backups yet.</p>');
+  res.send(`
+    <div style="margin-top:0.75rem">
+      ${keys
+        .map(
+          (key) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0.4rem 0;border-bottom:1px solid var(--divider);gap:0.5rem">
+        <span class="muted" style="font-size:0.8rem">${key.replace(".json", "")}</span>
+        <div style="display:flex;gap:0.5rem">
+          <a href="/admin/backups/${encodeURIComponent(key)}/download" class="btn btn-sm">Download</a>
+          <button class="btn btn-sm btn-danger"
+            hx-post="/admin/backups/${encodeURIComponent(key)}/restore"
+            hx-target="body" hx-swap="innerHTML"
+            hx-confirm="Restore from ${key.replace(".json", "")}? This overwrites all current data.">Restore</button>
+        </div>
+      </div>`
+        )
+        .join("")}
+    </div>`);
+}));
+
+app.get("/admin/backups/:ts/download", requireAdmin, asyncHandler(async (req, res) => {
+  const backupStore = getBackupStore();
+  if (!backupStore) return res.status(404).send("Backups unavailable on preview deploys.");
+  const data = await backupStore.get(req.params.ts, { type: "json" });
+  if (!data) return res.status(404).send("Backup not found");
+  res.set("Content-Type", "application/json");
+  res.set("Content-Disposition", `attachment; filename="ompu-backup-${req.params.ts}"`);
+  res.send(JSON.stringify(data, null, 2));
+}));
+
+app.post("/admin/backups/:ts/restore", requireAdmin, asyncHandler(async (req, res) => {
+  if (!USE_BLOBS) {
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Local mode — no blobs to restore.</p>'));
+    return;
+  }
+  const backupStore = getBackupStore();
+  if (!backupStore) {
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backups unavailable on preview deploys.</p>'));
+    return;
+  }
+  const data = await backupStore.get(req.params.ts, { type: "json" });
+  if (!data) {
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backup not found.</p>'));
+    return;
+  }
+  const store = getDataStore();
+  if (!store) {
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Data writes unavailable on preview deploys.</p>'));
+    return;
+  }
+  if (data.drinks) await store.setJSON("drinks.json", data.drinks);
+  if (data.djs) await store.setJSON("djs.json", data.djs);
+  if (data.artworks) await store.setJSON("artworks.json", data.artworks);
+  if (data.artists) await store.setJSON("artists.json", data.artists);
+  if (data.site) await store.setJSON("site.json", data.site);
+  const site = await loadSite();
+  res.send(adminLayout("Admin — Site", sitePageBody(site) + '<p class="muted" style="text-align:center;padding:1rem;color:var(--orange)">Restored from ' + req.params.ts.replace(".json", "") + '.</p>'));
 }));
 
 // --- Drink CRUD ---
