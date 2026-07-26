@@ -89,8 +89,8 @@ function formatPrice(val) {
   if (val == null) return "";
   const num = Number(val);
   if (isNaN(num)) return "";
-  const str = String(Math.round(num * 100) / 100);
-  return str.includes(".") ? str.replace(".", ",") : str;
+  if (num % 1 === 0) return String(num);
+  return num.toFixed(2).replace(".", ",");
 }
 
 function asyncHandler(fn) {

@@ -215,7 +215,7 @@ describe("Admin drink CRUD", () => {
     });
     const text = await res.text();
     assert.match(text, /Test Gin/);
-    assert.match(text, /€10,5/);
+    assert.match(text, /€10,50/);
   });
 
   it("edits an existing drink", async () => {
@@ -240,7 +240,7 @@ describe("Admin drink CRUD", () => {
     });
     const text = await res.text();
     assert.match(text, /Test Gin Edited/);
-    assert.match(text, /€11,5/);
+    assert.match(text, /€11,50/);
   });
 
   it("deletes a drink", async () => {
