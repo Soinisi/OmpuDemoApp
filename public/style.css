@@ -61,11 +61,11 @@ a:hover { color: var(--orange-warm); }
 
 .nav-logo { display: flex; align-items: center; }
 
-.nav-links { display: flex; gap: 2.5rem; }
+.nav-links { display: flex; gap: clamp(1rem, 3vw, 2.5rem); }
 
 .nav-link {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: clamp(0.7rem, 2vw, 0.9rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -788,8 +788,6 @@ select.input {
 
 @media (max-width: 600px) {
   .nav { padding: 0 1rem; }
-  .nav-links { gap: 1rem; }
-  .nav-link { font-size: 0.8rem; }
   .main { padding: 2rem 1rem 4rem; }
   .hero { padding: 2rem 0 2.25rem; }
   .hero-logo { height: 160px; max-width: 100%; }
