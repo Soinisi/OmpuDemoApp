@@ -788,7 +788,7 @@ select.input {
 
 @media (max-width: 600px) {
   .nav { padding: 0 1rem; }
-  .nav-links { gap: 1.25rem; }
+  .nav-links { gap: 1rem; }
   .nav-link { font-size: 0.8rem; }
   .main { padding: 2rem 1rem 4rem; }
   .hero { padding: 2rem 0 2.25rem; }

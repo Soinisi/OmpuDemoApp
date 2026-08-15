@@ -336,7 +336,11 @@ function isAdmin(req) {
 
 // --- Layout ---
 
-function layout(title, body) {
+function layout(title, body, opts = {}) {
+  const subtitle = opts.subtitle || "";
+  const footerHours = opts.footerHours || "Thu–Sat 20:00–02:00";
+  const footerAddress = opts.footerAddress || "42 Vinyl Lane";
+  const footerRule = opts.footerRule || "30+ only";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -364,7 +368,7 @@ function layout(title, body) {
 ${indent(body, 4)}
   </main>
   <footer class="footer">
-    <p>Thu–Sat 20:00–02:00 &nbsp;|&nbsp; 42 Vinyl Lane &nbsp;|&nbsp; 30+ only</p>
+    <p>${footerHours} &nbsp;|&nbsp; ${footerAddress} &nbsp;|&nbsp; ${footerRule}</p>
   </footer>
 </body>
 </html>`;
@@ -401,13 +405,15 @@ app.get("/", asyncHandler(async (_req, res) => {
   </div>
 </div>
 
-${bodyContent}`
+${bodyContent}`,
+      { footerHours: site.footer_hours, footerAddress: site.footer_address, footerRule: site.footer_rule }
     )
   );
 }));
 
 app.get("/drinks", asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
+  const site = await loadSite();
   const tabs = [
     { label: "Beer, Cider &amp; Others", cats: ["beer", "cider", "others"] },
     { label: "Wine", cats: ["wine"] },
@@ -430,7 +436,7 @@ app.get("/drinks", asyncHandler(async (req, res) => {
       `
 <div class="page-header">
   <h1 class="page-title">Drinks</h1>
-  <p class="page-subtitle">Crafted. No shortcuts.</p>
+  <p class="page-subtitle">${site.drinks_subtitle || "Crafted. No shortcuts."}</p>
 </div>
 <div class="tabs" role="tablist">
   ${visible
@@ -450,7 +456,8 @@ app.get("/drinks", asyncHandler(async (req, res) => {
 </div>
 <div id="drink-list">
   ${groupedDrinkCards(filtered, activeTab.cats)}
-</div>`
+</div>`,
+      { subtitle: site.drinks_subtitle, footerHours: site.footer_hours, footerAddress: site.footer_address, footerRule: site.footer_rule }
     )
   );
 }));
@@ -482,6 +489,7 @@ function drinkCard(d) {
 
 app.get("/djs", asyncHandler(async (_req, res) => {
   const djs = await loadDJs();
+  const site = await loadSite();
   const now = new Date();
   const upcoming = djs
     .filter((d) => new Date(d.date) >= now)
@@ -496,7 +504,7 @@ app.get("/djs", asyncHandler(async (_req, res) => {
       `
 <div class="page-header">
   <h1 class="page-title">Lineup</h1>
-  <p class="page-subtitle">The sound of ompu.</p>
+  <p class="page-subtitle">${site.djs_subtitle || "The sound of ompu."}</p>
 </div>
 <section class="section">
   <h2 class="section-title">Upcoming</h2>
@@ -519,6 +527,8 @@ ${
 </section>`
     : ""
 }`
+    ,
+    { subtitle: site.djs_subtitle, footerHours: site.footer_hours, footerAddress: site.footer_address, footerRule: site.footer_rule }
     )
   );
 }));
@@ -543,13 +553,14 @@ function djRow(d) {
 app.get("/art", asyncHandler(async (_req, res) => {
   const artworks = await loadArtworks();
   const artists = await loadArtists();
+  const site = await loadSite();
   res.send(
     layout(
       "Art",
       `
 <div class="page-header">
   <h1 class="page-title">Art</h1>
-  <p class="page-subtitle">Work exhibited inside the room. Rotating monthly.</p>
+  <p class="page-subtitle">${site.art_subtitle || "Work exhibited inside the room. Rotating monthly."}</p>
 </div>
 ${artists.length ? artistsSection(artists) : ""}
 <section class="section reveal">
@@ -560,6 +571,8 @@ ${artworks.length
   : '<p class="empty">No artworks yet.</p>'}
   </div>
 </section>`
+    ,
+    { subtitle: site.art_subtitle, footerHours: site.footer_hours, footerAddress: site.footer_address, footerRule: site.footer_rule }
     )
   );
 }));
@@ -724,6 +737,40 @@ function sitePageBody(site) {
   </form>
 </div>
 <div class="admin-add-form">
+  <h2>Footer &amp; Subtitles</h2>
+  <form hx-post="/admin/site/texts/footer" hx-target="body" hx-swap="innerHTML">
+    <div style="display:flex;flex-direction:column;gap:1rem;width:100%;max-width:420px">
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Footer Hours</label>
+        <input type="text" name="footer_hours" value="${escapeHtml(site.footer_hours || "Thu–Sat 20:00–02:00")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Footer Address</label>
+        <input type="text" name="footer_address" value="${escapeHtml(site.footer_address || "42 Vinyl Lane")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Footer Rule</label>
+        <input type="text" name="footer_rule" value="${escapeHtml(site.footer_rule || "30+ only")}" class="input" style="width:100%">
+      </div>
+      <div style="border-top:1px solid var(--divider);padding-top:1rem;margin-top:0.5rem">
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Drinks Subtitle</label>
+        <input type="text" name="drinks_subtitle" value="${escapeHtml(site.drinks_subtitle || "Crafted. No shortcuts.")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">DJs Subtitle</label>
+        <input type="text" name="djs_subtitle" value="${escapeHtml(site.djs_subtitle || "The sound of ompu.")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <label class="muted" style="font-size:0.75rem;display:block;margin-bottom:0.3rem">Art Subtitle</label>
+        <input type="text" name="art_subtitle" value="${escapeHtml(site.art_subtitle || "Work exhibited inside the room. Rotating monthly.")}" class="input" style="width:100%">
+      </div>
+      <div>
+        <button class="btn">Save</button>
+      </div>
+    </div>
+  </form>
+</div>
+<div class="admin-add-form">
   <h2>Backups</h2>
   <p class="muted" style="font-size:0.75rem;margin-bottom:0.75rem;line-height:1.5">Auto-snapshot on every login. Last 50 kept.</p>
   <div hx-get="/admin/backups" hx-trigger="load" hx-swap="innerHTML">
@@ -759,6 +806,18 @@ app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
   const site = await loadSite();
   site.hero_tagline = (req.body.hero_tagline || "").trim();
   site.hero_opening_hours = (req.body.hero_opening_hours || "").trim();
+  await saveSite(site);
+  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+}));
+
+app.post("/admin/site/texts/footer", requireAdmin, asyncHandler(async (req, res) => {
+  const site = await loadSite();
+  site.footer_hours = (req.body.footer_hours || "").trim();
+  site.footer_address = (req.body.footer_address || "").trim();
+  site.footer_rule = (req.body.footer_rule || "").trim();
+  site.drinks_subtitle = (req.body.drinks_subtitle || "").trim();
+  site.djs_subtitle = (req.body.djs_subtitle || "").trim();
+  site.art_subtitle = (req.body.art_subtitle || "").trim();
   await saveSite(site);
   res.send(adminLayout("Admin — Site", sitePageBody(site)));
 }));
