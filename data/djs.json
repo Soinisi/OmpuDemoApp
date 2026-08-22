@@ -110,5 +110,14 @@
     "date": "2026-06-06",
     "time": "21:00",
     "bio": "45s only. Sweaty, joyful, raw."
+  },
+  {
+    "id": 15,
+    "image": "",
+    "name": "DJ Simo",
+    "date": "2026-09-18",
+    "time": "21:00",
+    "genre": "",
+    "bio": ""
   }
 ]

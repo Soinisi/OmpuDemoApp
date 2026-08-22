@@ -1160,7 +1160,7 @@ function parseBulkDJs(text) {
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
-    const [name, date, time, genre, bio] = line.split("|").map((s) => (s || "").trim());
+    const [name = "", date = "", time = "", genre = "", bio = ""] = line.split("|").map((s) => (s || "").trim());
     if (!name || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
       skipped++;
       continue;
