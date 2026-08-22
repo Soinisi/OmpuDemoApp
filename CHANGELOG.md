@@ -6,6 +6,9 @@ and versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ## [Unreleased]
 
+### Fixed
+- Uploaded images no longer served corrupted on Netlify — `serverless-http` now handles image responses as binary. (#20)
+
 ## [1.1.0] - 2026-08-22
 
 ### Added

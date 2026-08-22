@@ -107,6 +107,11 @@ ADMIN_PASSWORD=yourpass node server.js
 - Login → extract cookie → pass to subsequent admin requests
 - htmx assertions: check for `Save`/`Cancel`/`Edit`/`Delete` buttons and `admin-row-edit` class on edit forms
 
+## Changelog & issues
+- `CHANGELOG.md` follows Keep a Changelog + SemVer. Every **user-facing** change (feature, bug fix, behavior change) gets an entry under `## [Unreleased]` in the right category (`Added`/`Changed`/`Fixed`/`Removed`/`Security`). Skip internal-only commits (refactor, docs, chore, tests, formatting) and anything reverted before release.
+- Every bug or feature is tracked as a GitHub issue (`gh issue create` with `bug`/`enhancement` label); reference it from the changelog entry as `(#NN)`.
+- When work ships via a PR, put `Closes #NN` in the PR body so the issue auto-closes on merge.
+
 ## Agent skills
 
 ### Issue tracker
