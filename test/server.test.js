@@ -5,6 +5,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const TEST_PW = "test-password";
+const DJ_PW = "dj-password";
+const ART_PW = "art-password";
 
 // Backup data files
 const drinksPath = path.join(__dirname, "..", "data", "drinks.json");
@@ -19,6 +21,8 @@ const artworksBackup = fs.readFileSync(artworksPath, "utf-8");
 const artistsBackup = fs.readFileSync(artistsPath, "utf-8");
 
 process.env.ADMIN_PASSWORD = TEST_PW;
+process.env.DJ_PASSWORD = DJ_PW;
+process.env.ART_PASSWORD = ART_PW;
 const app = require("../server");
 
 let server, baseURL;
@@ -41,6 +45,8 @@ after(() => {
   fs.writeFileSync(artworksPath, artworksBackup);
   fs.writeFileSync(artistsPath, artistsBackup);
   delete process.env.ADMIN_PASSWORD;
+  delete process.env.DJ_PASSWORD;
+  delete process.env.ART_PASSWORD;
 });
 
 async function fetch(path, opts = {}) {
@@ -177,6 +183,122 @@ describe("Admin auth", () => {
     const text = await res.text();
     assert.equal(res.status, 200);
     assert.match(text, /Manage DJs/);
+  });
+});
+
+// --- Admin roles ---
+
+describe("Admin roles", () => {
+  let djCookie, artCookie;
+
+  before(async () => {
+    const djRes = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + DJ_PW,
+      redirect: "manual",
+    });
+    assert.equal(djRes.status, 302);
+    djCookie = djRes.headers.get("set-cookie");
+
+    const artRes = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + ART_PW,
+      redirect: "manual",
+    });
+    assert.equal(artRes.status, 302);
+    artCookie = artRes.headers.get("set-cookie");
+  });
+
+  it("DJ role redirects to /admin/djs on login", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + DJ_PW,
+      redirect: "manual",
+    });
+    assert.equal(res.headers.get("location"), "/admin/djs");
+  });
+
+  it("art role redirects to /admin/art on login", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=" + ART_PW,
+      redirect: "manual",
+    });
+    assert.equal(res.headers.get("location"), "/admin/art");
+  });
+
+  it("DJ role can access /admin/djs", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs", {
+      headers: { cookie: djCookie },
+    });
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /Manage DJs/);
+  });
+
+  it("DJ role is denied /admin/drinks", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/drinks", {
+      headers: { cookie: djCookie },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+  });
+
+  it("DJ role is denied /admin/art", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: djCookie },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+  });
+
+  it("art role can access /admin/art", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: artCookie },
+    });
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /Manage Art/);
+  });
+
+  it("art role is denied /admin/drinks", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/drinks", {
+      headers: { cookie: artCookie },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+  });
+
+  it("art role is denied /admin/djs", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs", {
+      headers: { cookie: artCookie },
+      redirect: "manual",
+    });
+    assert.equal(res.status, 302);
+  });
+
+  it("DJ nav shows only Manage DJs and View Site", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs", {
+      headers: { cookie: djCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Manage DJs/);
+    assert.doesNotMatch(text, /Manage Drinks/);
+    assert.doesNotMatch(text, /Manage Art/);
+    assert.doesNotMatch(text, /href="\/admin\/site"/);
+  });
+
+  it("art nav shows only Manage Art and View Site", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/art", {
+      headers: { cookie: artCookie },
+    });
+    const text = await res.text();
+    assert.match(text, /Manage Art/);
+    assert.doesNotMatch(text, /Manage Drinks/);
+    assert.doesNotMatch(text, /Manage DJs/);
+    assert.doesNotMatch(text, /href="\/admin\/site"/);
   });
 });
 

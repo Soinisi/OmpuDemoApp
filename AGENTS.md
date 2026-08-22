@@ -49,11 +49,20 @@ ADMIN_PASSWORD=yourpass node server.js
 | Path | Purpose |
 |------|---------|
 | `/`, `/drinks`, `/djs`, `/art` | Public pages |
-| `/admin` | Login (signed HMAC cookie) |
+| `/admin` | Login (signed HMAC cookie, role in cookie payload) |
 | `/admin/drinks`, `/admin/djs`, `/admin/art` | CRUD — list, add, edit, delete |
 | `/admin/site` | Hero image, tagline, hours, homepage content, backups list |
 | `/admin/backups` | List/download/restore data snapshots (htmx sub-routes) |
 | `/admin/artists` | CRUD sub-routes for artists (no standalone page — lives on `/admin/art`) |
+
+## Auth roles
+- Three roles via separate passwords: `ADMIN_PASSWORD` → `master`, `DJ_PASSWORD` → `dj`, `ART_PASSWORD` → `art`
+- Empty `DJ_PASSWORD`/`ART_PASSWORD` disables that role
+- Cookie payload carries the role (`master`/`dj`/`art`); `getRole(req)` validates signature + role
+- `requireRole(...allowed)` middleware replaces the old `requireAdmin`; redirects to `/admin` on denial
+- Guard mapping: drinks+site+backups → `master`; djs → `master`,`dj`; art+artists → `master`,`art`
+- `adminLayout(title, body, role)` renders role-aware nav via `adminNav(role, title)`
+- Login redirects: dj → `/admin/djs`, art → `/admin/art`, master → `/admin/drinks`; `snapshotBlobs()` runs for all roles
 
 ## Netlify Deploy Architecture
 
@@ -73,7 +82,7 @@ ADMIN_PASSWORD=yourpass node server.js
 ### Backups
 - `snapshotBlobs()` called on every admin login — reads all 5 stores, writes timestamped bundle to `ompu-backups`
 - 50-backup cap: oldest deleted when exceeding limit
-- List/download/restore routes behind `requireAdmin`
+- List/download/restore routes behind `requireRole("master")`
 - `sitePageBody()` shows backup list via `hx-get="/admin/backups"` on load
 - Local mode skips backups; preview/branch deploys show "unavailable" message
 
@@ -91,7 +100,7 @@ ADMIN_PASSWORD=yourpass node server.js
 - Don't commit `site.json` changes — inline backup/restore in tests that modify it
 
 ## Tests
-- Node built-in test runner: `npm test` — 38 tests across 7 suites
+- Node built-in test runner: `npm test` — 48 tests across 8 suites
 - `findRowId(html, prefix, name)` helper — finds an item's DOM id by scanning for the row id attribute before the name text
 - Inline backup/restore pattern: read file before POST, `fs.writeFileSync` after assertions — prevents test artifacts
 - Top-level `after` hook restores all data files as safety net

@@ -9,6 +9,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY === "true";
 const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
+const DJ_PW = process.env.DJ_PASSWORD || "";
+const ART_PW = process.env.ART_PASSWORD || "";
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";
 const ROOT_DIR = __dirname;
@@ -303,14 +305,24 @@ app.use(express.static(path.join(ROOT_DIR, "public")));
 
 // --- Auth middleware ---
 
-function requireAdmin(req, res, next) {
-  if (isAdmin(req)) return next();
-  res.redirect("/admin");
+const ROLES = ["master", "dj", "art"];
+
+function getRole(req) {
+  const value = getCookie(req, ADMIN_COOKIE);
+  const [payload, signature] = value.split(".");
+  if (!ROLES.includes(payload) || !signature) return null;
+
+  const expected = sign(payload);
+  if (signature.length !== expected.length) return null;
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected)) ? payload : null;
 }
 
-function passwordMatches(password) {
-  if (!ADMIN_PW) return false;
-  return password === ADMIN_PW || password.trim() === ADMIN_PW.trim();
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    const role = getRole(req);
+    if (role && allowed.includes(role)) return next();
+    res.redirect("/admin");
+  };
 }
 
 function getCookie(req, name) {
@@ -322,16 +334,6 @@ function getCookie(req, name) {
 
 function sign(value) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
-}
-
-function isAdmin(req) {
-  const value = getCookie(req, ADMIN_COOKIE);
-  const [payload, signature] = value.split(".");
-  if (payload !== "1" || !signature) return false;
-
-  const expected = sign(payload);
-  if (signature.length !== expected.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
 // --- Layout ---
@@ -609,7 +611,23 @@ function artworkCard(a) {
 // ADMIN
 // ============================================================
 
-function adminLayout(title, body) {
+function adminNav(role, title) {
+  const links = [];
+  if (role === "master") {
+    links.push(`<a href="/admin/drinks" class="nav-link${title.includes("Drinks") ? " active" : ""}">Manage Drinks</a>`);
+    links.push(`<a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>`);
+    links.push(`<a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>`);
+    links.push(`<a href="/admin/site" class="nav-link${title.includes("Site") ? " active" : ""}">Site</a>`);
+  } else if (role === "dj") {
+    links.push(`<a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>`);
+  } else if (role === "art") {
+    links.push(`<a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>`);
+  }
+  links.push(`<a href="/" class="nav-link">View Site</a>`);
+  return links.join("\n    ");
+}
+
+function adminLayout(title, body, role) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -621,11 +639,7 @@ function adminLayout(title, body) {
 </head>
 <body>
   <nav class="nav admin-nav">
-    <a href="/admin/drinks" class="nav-link${title.includes("Drinks") ? " active" : ""}">Manage Drinks</a>
-    <a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>
-    <a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>
-    <a href="/admin/site" class="nav-link${title.includes("Site") ? " active" : ""}">Site</a>
-    <a href="/" class="nav-link">View Site</a>
+    ${adminNav(role, title)}
     <form action="/admin/logout" method="post" style="display:inline">
       <button class="btn btn-ghost">Logout</button>
     </form>
@@ -661,21 +675,30 @@ app.get("/admin", (_req, res) => {
 });
 
 app.post("/admin/login", asyncHandler(async (req, res) => {
-  if (!ADMIN_PW) {
-    return res.status(500).send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">ADMIN_PASSWORD is not configured.</p>`);
+  if (!ADMIN_PW && !DJ_PW && !ART_PW) {
+    return res.status(500).send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">No admin passwords configured.</p>`);
   }
 
-  if (passwordMatches(req.body.password || "")) {
-    res.cookie(ADMIN_COOKIE, `1.${sign("1")}`, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: IS_NETLIFY,
-      maxAge: 1000 * 60 * 60 * 24 * 30,
-    });
-    snapshotBlobs();
-    return res.redirect("/admin/drinks");
+  const pw = (req.body.password || "").trim();
+  let role = null;
+  if (ADMIN_PW && pw === ADMIN_PW) role = "master";
+  else if (DJ_PW && pw === DJ_PW) role = "dj";
+  else if (ART_PW && pw === ART_PW) role = "art";
+
+  if (!role) {
+    return res.send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">Wrong password.</p>`);
   }
-  res.send(`<p style="color:#E85D04;text-align:center;margin-top:2rem">Wrong password.</p>`);
+
+  res.cookie(ADMIN_COOKIE, `${role}.${sign(role)}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: IS_NETLIFY,
+    maxAge: 1000 * 60 * 60 * 24 * 30,
+  });
+  snapshotBlobs();
+  if (role === "dj") return res.redirect("/admin/djs");
+  if (role === "art") return res.redirect("/admin/art");
+  return res.redirect("/admin/drinks");
 }));
 
 app.post("/admin/logout", (req, res) => {
@@ -779,38 +802,38 @@ function sitePageBody(site) {
 </div>`;
 }
 
-app.get("/admin/site", requireAdmin, asyncHandler(async (_req, res) => {
+app.get("/admin/site", requireRole("master"), asyncHandler(async (req, res) => {
   const site = await loadSite();
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
-app.post("/admin/site", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+app.post("/admin/site", requireRole("master"), upload.single("image"), asyncHandler(async (req, res) => {
   const site = await loadSite();
   if (req.file) {
     await removeImage(site.hero_image);
     site.hero_image = await saveUploadedImage(req.file);
     await saveSite(site);
   }
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
-app.post("/admin/site/remove-hero", requireAdmin, asyncHandler(async (req, res) => {
+app.post("/admin/site/remove-hero", requireRole("master"), asyncHandler(async (req, res) => {
   const site = await loadSite();
   await removeImage(site.hero_image);
   site.hero_image = "";
   await saveSite(site);
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
-app.post("/admin/site/texts", requireAdmin, asyncHandler(async (req, res) => {
+app.post("/admin/site/texts", requireRole("master"), asyncHandler(async (req, res) => {
   const site = await loadSite();
   site.hero_tagline = (req.body.hero_tagline || "").trim();
   site.hero_opening_hours = (req.body.hero_opening_hours || "").trim();
   await saveSite(site);
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
-app.post("/admin/site/texts/footer", requireAdmin, asyncHandler(async (req, res) => {
+app.post("/admin/site/texts/footer", requireRole("master"), asyncHandler(async (req, res) => {
   const site = await loadSite();
   site.footer_hours = (req.body.footer_hours || "").trim();
   site.footer_address = (req.body.footer_address || "").trim();
@@ -819,19 +842,19 @@ app.post("/admin/site/texts/footer", requireAdmin, asyncHandler(async (req, res)
   site.djs_subtitle = (req.body.djs_subtitle || "").trim();
   site.art_subtitle = (req.body.art_subtitle || "").trim();
   await saveSite(site);
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
-app.post("/admin/site/home", requireAdmin, asyncHandler(async (req, res) => {
+app.post("/admin/site/home", requireRole("master"), asyncHandler(async (req, res) => {
   const site = await loadSite();
   site.home_content = (req.body.home_content || "").trim();
   await saveSite(site);
-  res.send(adminLayout("Admin — Site", sitePageBody(site)));
+  res.send(adminLayout("Admin — Site", sitePageBody(site), getRole(req)));
 }));
 
 // --- Backups ---
 
-app.get("/admin/backups", requireAdmin, asyncHandler(async (_req, res) => {
+app.get("/admin/backups", requireRole("master"), asyncHandler(async (_req, res) => {
   if (!USE_BLOBS) return res.send('<p class="muted">No backups in local mode.</p>');
   const backupStore = getBackupStore();
   if (!backupStore) return res.send('<p class="muted">Backups unavailable on preview deploys.</p>');
@@ -858,7 +881,7 @@ app.get("/admin/backups", requireAdmin, asyncHandler(async (_req, res) => {
     </div>`);
 }));
 
-app.get("/admin/backups/:ts/download", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/backups/:ts/download", requireRole("master"), asyncHandler(async (req, res) => {
   const backupStore = getBackupStore();
   if (!backupStore) return res.status(404).send("Backups unavailable on preview deploys.");
   const data = await backupStore.get(req.params.ts, { type: "json" });
@@ -868,24 +891,24 @@ app.get("/admin/backups/:ts/download", requireAdmin, asyncHandler(async (req, re
   res.send(JSON.stringify(data, null, 2));
 }));
 
-app.post("/admin/backups/:ts/restore", requireAdmin, asyncHandler(async (req, res) => {
+app.post("/admin/backups/:ts/restore", requireRole("master"), asyncHandler(async (req, res) => {
   if (!USE_BLOBS) {
-    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Local mode — no blobs to restore.</p>'));
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Local mode — no blobs to restore.</p>', getRole(req)));
     return;
   }
   const backupStore = getBackupStore();
   if (!backupStore) {
-    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backups unavailable on preview deploys.</p>'));
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backups unavailable on preview deploys.</p>', getRole(req)));
     return;
   }
   const data = await backupStore.get(req.params.ts, { type: "json" });
   if (!data) {
-    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backup not found.</p>'));
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Backup not found.</p>', getRole(req)));
     return;
   }
   const store = getDataStore();
   if (!store) {
-    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Data writes unavailable on preview deploys.</p>'));
+    res.send(adminLayout("Admin — Site", sitePageBody(await loadSite()) + '<p class="muted" style="text-align:center;padding:1rem">Data writes unavailable on preview deploys.</p>', getRole(req)));
     return;
   }
   if (data.drinks) await store.setJSON("drinks.json", data.drinks);
@@ -894,7 +917,7 @@ app.post("/admin/backups/:ts/restore", requireAdmin, asyncHandler(async (req, re
   if (data.artists) await store.setJSON("artists.json", data.artists);
   if (data.site) await store.setJSON("site.json", data.site);
   const site = await loadSite();
-  res.send(adminLayout("Admin — Site", sitePageBody(site) + '<p class="muted" style="text-align:center;padding:1rem;color:var(--orange)">Restored from ' + req.params.ts.replace(".json", "") + '.</p>'));
+  res.send(adminLayout("Admin — Site", sitePageBody(site) + '<p class="muted" style="text-align:center;padding:1rem;color:var(--orange)">Restored from ' + req.params.ts.replace(".json", "") + '.</p>', getRole(req)));
 }));
 
 // --- Drink CRUD ---
@@ -916,7 +939,7 @@ function categoryDropdown(selected) {
     .join("\n          ");
 }
 
-app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
+app.get("/admin/drinks", requireRole("master"), asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
   res.send(
     adminLayout(
@@ -940,12 +963,13 @@ app.get("/admin/drinks", requireAdmin, asyncHandler(async (_req, res) => {
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
   </form>
-</div>`
-    )
+</div>`,
+    getRole(req)
+  )
   );
 }));
 
-app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+app.post("/admin/drinks", requireRole("master"), upload.single("image"), asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
   const { id, name, category, description, price } = req.body;
 
@@ -972,7 +996,7 @@ app.post("/admin/drinks", requireAdmin, upload.single("image"), asyncHandler(asy
   res.send(adminDrinkList(drinks));
 }));
 
-app.delete("/admin/drinks/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.delete("/admin/drinks/:id", requireRole("master"), asyncHandler(async (req, res) => {
   let drinks = await loadDrinks();
   const drink = drinks.find((d) => d.id === +req.params.id);
   if (drink) await removeImage(drink.image);
@@ -1009,7 +1033,7 @@ function adminDrinkRow(d) {
 </div>`;
 }
 
-app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/drinks/edit/:id", requireRole("master"), asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
@@ -1036,7 +1060,7 @@ app.get("/admin/drinks/edit/:id", requireAdmin, asyncHandler(async (req, res) =>
 </div>`);
 }));
 
-app.get("/admin/drinks/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/drinks/cancel/:id", requireRole("master"), asyncHandler(async (req, res) => {
   const drinks = await loadDrinks();
   const d = drinks.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
@@ -1057,7 +1081,7 @@ function formatEUDate(str) {
   return `${d}/${m}/${y}`;
 }
 
-app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
+app.get("/admin/djs", requireRole("master", "dj"), asyncHandler(async (req, res) => {
   const djs = (await loadDJs()).sort((a, b) => new Date(b.date) - new Date(a.date));
   res.send(
     adminLayout(
@@ -1080,12 +1104,13 @@ app.get("/admin/djs", requireAdmin, asyncHandler(async (_req, res) => {
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
   </form>
-</div>`
-    )
+</div>`,
+    getRole(req)
+  )
   );
 }));
 
-app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+app.post("/admin/djs", requireRole("master", "dj"), upload.single("image"), asyncHandler(async (req, res) => {
   const djs = await loadDJs();
   const { id, name, genre, date, time, bio } = req.body;
   const parsedDate = parseEUDate(date);
@@ -1113,7 +1138,7 @@ app.post("/admin/djs", requireAdmin, upload.single("image"), asyncHandler(async 
   res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
 }));
 
-app.delete("/admin/djs/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.delete("/admin/djs/:id", requireRole("master", "dj"), asyncHandler(async (req, res) => {
   let djs = await loadDJs();
   const dj = djs.find((d) => d.id === +req.params.id);
   if (dj) await removeImage(dj.image);
@@ -1150,7 +1175,7 @@ function adminDJRow(d) {
 </div>`;
 }
 
-app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/djs/edit/:id", requireRole("master", "dj"), asyncHandler(async (req, res) => {
   const djs = await loadDJs();
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.status(404).send("Not found");
@@ -1176,7 +1201,7 @@ app.get("/admin/djs/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
 </div>`);
 }));
 
-app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/djs/cancel/:id", requireRole("master", "dj"), asyncHandler(async (req, res) => {
   const djs = await loadDJs();
   const d = djs.find((d) => d.id === +req.params.id);
   if (!d) return res.send("");
@@ -1185,7 +1210,7 @@ app.get("/admin/djs/cancel/:id", requireAdmin, asyncHandler(async (req, res) => 
 
 // --- Art CRUD (includes Artists) ---
 
-app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
+app.get("/admin/art", requireRole("master", "art"), asyncHandler(async (req, res) => {
   const artworks = await loadArtworks();
   const artists = await loadArtists();
   res.send(
@@ -1224,12 +1249,13 @@ app.get("/admin/art", requireAdmin, asyncHandler(async (_req, res) => {
     <input type="hidden" name="id" value="0">
     <button class="btn">Add</button>
   </form>
-</div>`
-    )
+</div>`,
+    getRole(req)
+  )
   );
 }));
 
-app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+app.post("/admin/art", requireRole("master", "art"), upload.single("image"), asyncHandler(async (req, res) => {
   const artworks = await loadArtworks();
   const { id, name, description } = req.body;
 
@@ -1253,7 +1279,7 @@ app.post("/admin/art", requireAdmin, upload.single("image"), asyncHandler(async 
   res.send(adminArtworkList(artworks));
 }));
 
-app.delete("/admin/art/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.delete("/admin/art/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   let artworks = await loadArtworks();
   const artwork = artworks.find((a) => a.id === +req.params.id);
   if (artwork) await removeImage(artwork.image);
@@ -1288,7 +1314,7 @@ function adminArtworkRow(a) {
 </div>`;
 }
 
-app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/art/edit/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   const artworks = await loadArtworks();
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.status(404).send("Not found");
@@ -1311,14 +1337,14 @@ app.get("/admin/art/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
 </div>`);
 }));
 
-app.get("/admin/art/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/art/cancel/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   const artworks = await loadArtworks();
   const a = artworks.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
   res.send(adminArtworkRow(a));
 }));
 
-app.post("/admin/artists", requireAdmin, upload.single("image"), asyncHandler(async (req, res) => {
+app.post("/admin/artists", requireRole("master", "art"), upload.single("image"), asyncHandler(async (req, res) => {
   const artists = await loadArtists();
   const { id, name, bio } = req.body;
 
@@ -1342,7 +1368,7 @@ app.post("/admin/artists", requireAdmin, upload.single("image"), asyncHandler(as
   res.send(adminArtistList(artists));
 }));
 
-app.delete("/admin/artists/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.delete("/admin/artists/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   let artists = await loadArtists();
   const artist = artists.find((a) => a.id === +req.params.id);
   if (artist) await removeImage(artist.image);
@@ -1377,7 +1403,7 @@ function adminArtistRow(a) {
 </div>`;
 }
 
-app.get("/admin/artists/edit/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/artists/edit/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   const artists = await loadArtists();
   const a = artists.find((a) => a.id === +req.params.id);
   if (!a) return res.status(404).send("Not found");
@@ -1400,7 +1426,7 @@ app.get("/admin/artists/edit/:id", requireAdmin, asyncHandler(async (req, res) =
 </div>`);
 }));
 
-app.get("/admin/artists/cancel/:id", requireAdmin, asyncHandler(async (req, res) => {
+app.get("/admin/artists/cancel/:id", requireRole("master", "art"), asyncHandler(async (req, res) => {
   const artists = await loadArtists();
   const a = artists.find((a) => a.id === +req.params.id);
   if (!a) return res.send("");
