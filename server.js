@@ -263,6 +263,9 @@ async function snapshotBlobs() {
     console.error("ompu backup snapshot failed:", e);
   }
 }
+const RECENT_IMAGE_TTL_MS = 10 * 60 * 1000;
+const recentImages = new Map();
+
 async function saveUploadedImage(file) {
   if (!file) return "";
   if (!USE_BLOBS) return file.filename;
@@ -274,6 +277,7 @@ async function saveUploadedImage(file) {
   await store.set(filename, body, {
     metadata: { contentType: file.mimetype },
   });
+  recentImages.set(filename, { data: body, contentType: file.mimetype, at: Date.now() });
   return filename;
 }
 async function removeImage(filename) {
@@ -290,9 +294,23 @@ async function removeImage(filename) {
 
 app.get("/images/:filename", asyncHandler(async (req, res) => {
   if (USE_BLOBS) {
+    const cached = recentImages.get(req.params.filename);
+    if (cached) {
+      if (Date.now() - cached.at > RECENT_IMAGE_TTL_MS) {
+        recentImages.delete(req.params.filename);
+      } else {
+        res.type(cached.contentType || path.extname(req.params.filename));
+        return res.send(Buffer.from(cached.data));
+      }
+    }
+
     const store = getImageStore();
     if (store) {
-      const blob = await store.getWithMetadata(req.params.filename, { type: "arrayBuffer" });
+      let blob = await store.getWithMetadata(req.params.filename, { type: "arrayBuffer" });
+      for (let i = 0; !blob && i < 4; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        blob = await store.getWithMetadata(req.params.filename, { type: "arrayBuffer" });
+      }
       if (blob) {
         res.type((blob.metadata && blob.metadata.contentType) || path.extname(req.params.filename));
         return res.send(Buffer.from(blob.data));
