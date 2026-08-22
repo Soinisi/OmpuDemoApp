@@ -500,6 +500,26 @@ describe("Admin DJ CRUD", () => {
     assert.match(text, /Edit/);
     assert.match(text, /Delete/);
   });
+
+  it("bulk adds DJs, skipping invalid and duplicate lines", async () => {
+    const bulk = [
+      "Bulk Test | 15/01/2027 | 21:00 | Test Genre | Test bio",
+      "No Date DJ",
+      "DJ Solstice | 20/06/2026",
+    ].join("\n");
+    const res = await globalThis.fetch(baseURL + "/admin/djs/bulk", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: new URLSearchParams({ dj_bulk: bulk }).toString(),
+    });
+    const text = await res.text();
+    assert.match(text, /Bulk Test/);
+    assert.match(text, /Test Genre/);
+    assert.match(text, /Added 1, skipped 2\./);
+  });
 });
 
 // --- Admin Art CRUD ---

@@ -1092,6 +1092,22 @@ app.get("/admin/djs", requireRole("master", "dj"), asyncHandler(async (req, res)
   ${adminDJList(djs)}
 </div>
 <div class="admin-add-form">
+  <h2>Bulk Add</h2>
+  <p class="muted" style="font-size:0.75rem;margin-bottom:0.75rem;line-height:1.5">
+    Paste one DJ per line.<br>
+    Format: <code>name | date | time | genre | bio</code><br>
+    <code>name</code> and <code>date</code> (dd/mm/yyyy) are required;
+    <code>time</code>, <code>genre</code> and <code>bio</code> are optional.<br>
+    Example: <code>DJ Solstice | 20/06/2026 | 22:00 | Deep House | Berlin-trained selector</code>
+  </p>
+  <form hx-post="/admin/djs/bulk" hx-target="#dj-admin-list" hx-swap="innerHTML"
+        hx-on::after-request="this.reset()">
+    <textarea name="dj_bulk" rows="10" class="input"
+              style="width:100%;resize:vertical;font-family:monospace;font-size:0.8rem;line-height:1.4"></textarea>
+    <button class="btn" style="margin-top:0.5rem">Add</button>
+  </form>
+</div>
+<div class="admin-add-form">
   <h2>Add DJ</h2>
   <form hx-post="/admin/djs" hx-target="#dj-admin-list" hx-swap="innerHTML"
         hx-encoding="multipart/form-data" hx-on::after-request="this.reset()">
@@ -1136,6 +1152,45 @@ app.post("/admin/djs", requireRole("master", "dj"), upload.single("image"), asyn
   });
   await saveDJs(djs);
   res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
+}));
+
+function parseBulkDJs(text) {
+  const items = [];
+  let skipped = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const [name, date, time, genre, bio] = line.split("|").map((s) => (s || "").trim());
+    if (!name || !/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(date)) {
+      skipped++;
+      continue;
+    }
+    items.push({ name, date: parseEUDate(date), time, genre, bio });
+  }
+  return { items, skipped };
+}
+
+app.post("/admin/djs/bulk", requireRole("master", "dj"), asyncHandler(async (req, res) => {
+  const djs = await loadDJs();
+  const { items, skipped: parseSkipped } = parseBulkDJs(req.body.dj_bulk || "");
+
+  let added = 0;
+  let skipped = parseSkipped;
+  for (const item of items) {
+    if (djs.some((d) => d.name === item.name && d.date === item.date)) {
+      skipped++;
+      continue;
+    }
+    const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
+    djs.push({ id: newId, image: "", ...item });
+    added++;
+  }
+
+  await saveDJs(djs);
+  res.send(
+    `<p class="muted" style="margin:0.5rem 0">Added ${added}, skipped ${skipped}.</p>\n` +
+      adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date)))
+  );
 }));
 
 app.delete("/admin/djs/:id", requireRole("master", "dj"), asyncHandler(async (req, res) => {
