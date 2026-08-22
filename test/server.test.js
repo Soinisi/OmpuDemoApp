@@ -441,6 +441,19 @@ describe("Admin DJ CRUD", () => {
     assert.match(text, /Test Genre/);
   });
 
+  it("rejects a DJ with an invalid date", async () => {
+    const res = await globalThis.fetch(baseURL + "/admin/djs", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: "id=0&name=Bad+Date+DJ&genre=Test&date=31/02/2026&time=22:00&bio=x",
+    });
+    assert.equal(res.status, 400);
+    assert.match(await res.text(), /Invalid date/);
+  });
+
   it("edits an existing DJ", async () => {
     const listRes = await globalThis.fetch(baseURL + "/admin/djs", {
       headers: { cookie: adminCookie },
@@ -499,6 +512,27 @@ describe("Admin DJ CRUD", () => {
     assert.match(text, /DJ Solstice/);
     assert.match(text, /Edit/);
     assert.match(text, /Delete/);
+  });
+
+  it("bulk adds DJs, skipping invalid and duplicate lines", async () => {
+    const bulk = [
+      "Bulk Test | 15/01/2027 | 21:00 | Test Genre | Test bio",
+      "No Date DJ",
+      "DJ Solstice | 20/06/2026",
+      "Bad Date | 31/02/2027",
+    ].join("\n");
+    const res = await globalThis.fetch(baseURL + "/admin/djs/bulk", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: adminCookie,
+      },
+      body: new URLSearchParams({ dj_bulk: bulk }).toString(),
+    });
+    const text = await res.text();
+    assert.match(text, /Bulk Test/);
+    assert.match(text, /Test Genre/);
+    assert.match(text, /Added 1, skipped 3\./);
   });
 });
 

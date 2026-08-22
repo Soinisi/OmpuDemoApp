@@ -106,3 +106,17 @@ ADMIN_PASSWORD=yourpass node server.js
 - Top-level `after` hook restores all data files as safety net
 - Login → extract cookie → pass to subsequent admin requests
 - htmx assertions: check for `Save`/`Cancel`/`Edit`/`Delete` buttons and `admin-row-edit` class on edit forms
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues for `Soinisi/OmpuDemoApp` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles map to same-named labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

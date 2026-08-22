@@ -8,9 +8,9 @@ const { getStore, getDeployStore } = require("@netlify/blobs");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY === "true";
-const ADMIN_PW = process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin");
-const DJ_PW = process.env.DJ_PASSWORD || "";
-const ART_PW = process.env.ART_PASSWORD || "";
+const ADMIN_PW = (process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin")).trim();
+const DJ_PW = (process.env.DJ_PASSWORD || "").trim();
+const ART_PW = (process.env.ART_PASSWORD || "").trim();
 const SESSION_SECRET = process.env.SESSION_SECRET || "ompu-bar-secret-" + (ADMIN_PW || "fallback");
 const ADMIN_COOKIE = "ompu_admin";
 const ROOT_DIR = __dirname;
@@ -236,6 +236,10 @@ function loadSite() {
 }
 function saveSite(data) {
   return saveData("site", data);
+}
+
+function nextId(list) {
+  return list.length ? Math.max(...list.map((x) => x.id)) + 1 : 1;
 }
 async function snapshotBlobs() {
   if (!USE_BLOBS) return;
@@ -611,18 +615,23 @@ function artworkCard(a) {
 // ADMIN
 // ============================================================
 
+const ADMIN_NAV = {
+  master: [
+    ["/admin/drinks", "Manage Drinks", "Drinks"],
+    ["/admin/djs", "Manage DJs", "DJs"],
+    ["/admin/art", "Manage Art", "Art"],
+    ["/admin/site", "Site", "Site"],
+  ],
+  dj: [["/admin/djs", "Manage DJs", "DJs"]],
+  art: [["/admin/art", "Manage Art", "Art"]],
+};
+
+function navLink(title, href, label, key) {
+  return `<a href="${href}" class="nav-link${title.includes(key) ? " active" : ""}">${label}</a>`;
+}
+
 function adminNav(role, title) {
-  const links = [];
-  if (role === "master") {
-    links.push(`<a href="/admin/drinks" class="nav-link${title.includes("Drinks") ? " active" : ""}">Manage Drinks</a>`);
-    links.push(`<a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>`);
-    links.push(`<a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>`);
-    links.push(`<a href="/admin/site" class="nav-link${title.includes("Site") ? " active" : ""}">Site</a>`);
-  } else if (role === "dj") {
-    links.push(`<a href="/admin/djs" class="nav-link${title.includes("DJs") ? " active" : ""}">Manage DJs</a>`);
-  } else if (role === "art") {
-    links.push(`<a href="/admin/art" class="nav-link${title.includes("Art") ? " active" : ""}">Manage Art</a>`);
-  }
+  const links = (ADMIN_NAV[role] || []).map(([href, label, key]) => navLink(title, href, label, key));
   links.push(`<a href="/" class="nav-link">View Site</a>`);
   return links.join("\n    ");
 }
@@ -986,7 +995,7 @@ app.post("/admin/drinks", requireRole("master"), upload.single("image"), asyncHa
     return;
   }
 
-  const newId = drinks.length ? Math.max(...drinks.map((d) => d.id)) + 1 : 1;
+  const newId = nextId(drinks);
   const image = await saveUploadedImage(req.file);
   drinks.push({
     id: newId, name, category, description, price: parsePrice(price),
@@ -1070,9 +1079,14 @@ app.get("/admin/drinks/cancel/:id", requireRole("master"), asyncHandler(async (r
 // --- DJ CRUD ---
 
 function parseEUDate(str) {
-  const parts = str.split("/");
-  if (parts.length !== 3) return str;
-  return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(str);
+  if (!m) return null;
+  const d = +m[1];
+  const mo = +m[2];
+  const y = +m[3];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 function formatEUDate(str) {
@@ -1081,8 +1095,12 @@ function formatEUDate(str) {
   return `${d}/${m}/${y}`;
 }
 
+function sortDJsByDate(djs) {
+  return djs.sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
 app.get("/admin/djs", requireRole("master", "dj"), asyncHandler(async (req, res) => {
-  const djs = (await loadDJs()).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const djs = sortDJsByDate(await loadDJs());
   res.send(
     adminLayout(
       "Admin — DJs",
@@ -1090,6 +1108,22 @@ app.get("/admin/djs", requireRole("master", "dj"), asyncHandler(async (req, res)
 <h1 class="page-title">DJs</h1>
 <div id="dj-admin-list">
   ${adminDJList(djs)}
+</div>
+<div class="admin-add-form">
+  <h2>Bulk Add</h2>
+  <p class="muted" style="font-size:0.75rem;margin-bottom:0.75rem;line-height:1.5">
+    Paste one DJ per line.<br>
+    Format: <code>name | date | time | genre | bio</code><br>
+    <code>name</code> and <code>date</code> (dd/mm/yyyy) are required;
+    <code>time</code>, <code>genre</code> and <code>bio</code> are optional.<br>
+    Example: <code>DJ Solstice | 20/06/2026 | 22:00 | Deep House | Berlin-trained selector</code>
+  </p>
+  <form hx-post="/admin/djs/bulk" hx-target="#dj-admin-list" hx-swap="innerHTML"
+        hx-on::after-request="this.reset()">
+    <textarea name="dj_bulk" rows="10" class="input"
+              style="width:100%;resize:vertical;font-family:monospace;font-size:0.8rem;line-height:1.4"></textarea>
+    <button class="btn" style="margin-top:0.5rem">Add</button>
+  </form>
 </div>
 <div class="admin-add-form">
   <h2>Add DJ</h2>
@@ -1114,6 +1148,9 @@ app.post("/admin/djs", requireRole("master", "dj"), upload.single("image"), asyn
   const djs = await loadDJs();
   const { id, name, genre, date, time, bio } = req.body;
   const parsedDate = parseEUDate(date);
+  if (!parsedDate) {
+    return res.status(400).send(`<p style="color:#E85D04">Invalid date — use dd/mm/yyyy.</p>`);
+  }
 
   const existing = +id > 0 ? djs.find((d) => d.id === +id) : null;
 
@@ -1128,14 +1165,54 @@ app.post("/admin/djs", requireRole("master", "dj"), upload.single("image"), asyn
     return;
   }
 
-  const newId = djs.length ? Math.max(...djs.map((d) => d.id)) + 1 : 1;
+  const newId = nextId(djs);
   const image = await saveUploadedImage(req.file);
   djs.push({
     id: newId, name, genre, date: parsedDate, time, bio,
     image,
   });
   await saveDJs(djs);
-  res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
+  res.send(adminDJList(sortDJsByDate(djs)));
+}));
+
+function parseBulkDJs(text) {
+  const items = [];
+  let skipped = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const [name = "", date = "", time = "", genre = "", bio = ""] = line.split("|").map((s) => (s || "").trim());
+    const parsed = parseEUDate(date);
+    if (!name || !parsed) {
+      skipped++;
+      continue;
+    }
+    items.push({ name, date: parsed, time, genre, bio });
+  }
+  return { items, skipped };
+}
+
+app.post("/admin/djs/bulk", requireRole("master", "dj"), asyncHandler(async (req, res) => {
+  const djs = await loadDJs();
+  const { items, skipped: parseSkipped } = parseBulkDJs(req.body.dj_bulk || "");
+
+  let added = 0;
+  let skipped = parseSkipped;
+  for (const item of items) {
+    if (djs.some((d) => d.name === item.name && d.date === item.date)) {
+      skipped++;
+      continue;
+    }
+    const newId = nextId(djs);
+    djs.push({ id: newId, image: "", ...item });
+    added++;
+  }
+
+  await saveDJs(djs);
+  res.send(
+    `<p class="muted" style="margin:0.5rem 0">Added ${added}, skipped ${skipped}.</p>\n` +
+      adminDJList(sortDJsByDate(djs))
+  );
 }));
 
 app.delete("/admin/djs/:id", requireRole("master", "dj"), asyncHandler(async (req, res) => {
@@ -1144,7 +1221,7 @@ app.delete("/admin/djs/:id", requireRole("master", "dj"), asyncHandler(async (re
   if (dj) await removeImage(dj.image);
   djs = djs.filter((d) => d.id !== +req.params.id);
   await saveDJs(djs);
-  res.send(adminDJList(djs.sort((a, b) => new Date(b.date) - new Date(a.date))));
+  res.send(adminDJList(sortDJsByDate(djs)));
 }));
 
 function adminDJList(djs) {
@@ -1272,7 +1349,7 @@ app.post("/admin/art", requireRole("master", "art"), upload.single("image"), asy
     return;
   }
 
-  const newId = artworks.length ? Math.max(...artworks.map((a) => a.id)) + 1 : 1;
+  const newId = nextId(artworks);
   const image = await saveUploadedImage(req.file);
   artworks.push({ id: newId, name, description, image });
   await saveArtworks(artworks);
@@ -1361,7 +1438,7 @@ app.post("/admin/artists", requireRole("master", "art"), upload.single("image"),
     return;
   }
 
-  const newId = artists.length ? Math.max(...artists.map((a) => a.id)) + 1 : 1;
+  const newId = nextId(artists);
   const image = await saveUploadedImage(req.file);
   artists.push({ id: newId, name, bio, image });
   await saveArtists(artists);
