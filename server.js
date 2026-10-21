@@ -7,7 +7,7 @@ const { getStore, getDeployStore } = require("@netlify/blobs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY === "true";
+const IS_NETLIFY = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const ADMIN_PW = (process.env.ADMIN_PASSWORD || (IS_NETLIFY ? "" : "admin")).trim();
 const DJ_PW = (process.env.DJ_PASSWORD || "").trim();
 const ART_PW = (process.env.ART_PASSWORD || "").trim();

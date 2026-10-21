@@ -11,6 +11,8 @@ ADMIN_PASSWORD=yourpass node server.js
 
 Open `http://localhost:3000`.
 
+If `ADMIN_PASSWORD` is unset, local dev falls back to password `admin`; production never falls back — the master role stays disabled until a password is set.
+
 Local admin changes write to tracked files in `data/` and `public/images/`, so you can review them with `git status`, commit, and push.
 
 ## Pages
@@ -65,7 +67,9 @@ Production data is independent from git. The first Netlify request seeds Blob st
 npm test
 ```
 
-Uses Node's built-in test runner. 48 tests cover all public pages, admin CRUD, and role-based auth.
+Uses Node's built-in test runner. 50 tests cover all public pages, admin CRUD, and role-based auth.
+
+Full changes can be validated end-to-end with the local [`no-mistakes`](https://kunchenguid.github.io/no-mistakes/) gate: commit on a feature branch, then `no-mistakes axi run --intent "..."` (review, test, document, lint, push, PR, CI). See `AGENTS.md` → Quality gate.
 
 ## Tech
 
