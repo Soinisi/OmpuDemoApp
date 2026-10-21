@@ -23,6 +23,7 @@
 npm install
 ADMIN_PASSWORD=yourpass node server.js
 ```
+- Without `ADMIN_PASSWORD` (and not on Netlify), the admin password defaults to `admin` so local dev works out of the box.
 
 ## Data
 - 5 JSON stores in `data/`: `drinks.json`, `djs.json`, `artworks.json`, `artists.json`, `site.json`
@@ -44,16 +45,19 @@ ADMIN_PASSWORD=yourpass node server.js
 - **Price handling:** stored as float internally; input `type="text"` accepts `8.5` or `8,5` via `parsePrice()`; display via `formatPrice()` — comma separator, 2 decimal places (`€8,50`), whole numbers no trailing zeros (`€8`)
 - **Date handling (DJs):** stored as `yyyy-mm-dd`; admin input `dd/mm/yyyy` text field via `parseEUDate()`/`formatEUDate()`; public display via `toLocaleDateString("en-GB", ...)`
 - **Admin dropdowns:** `categoryDropdown(selected)` helper generates `<select>` options to avoid duplication
+- **Homepage content:** `site.home_content` is mini-markdown — `## ` headings become `<section>` blocks, a `[label](url)` line becomes a link (rendered by `renderHomeContent()`)
 
 ## Routes
 | Path | Purpose |
 |------|---------|
 | `/`, `/drinks`, `/djs`, `/art` | Public pages |
-| `/admin` | Login (signed HMAC cookie, role in cookie payload) |
-| `/admin/drinks`, `/admin/djs`, `/admin/art` | CRUD — list, add, edit, delete |
-| `/admin/site` | Hero image, tagline, hours, homepage content, backups list |
-| `/admin/backups` | List/download/restore data snapshots (htmx sub-routes) |
-| `/admin/artists` | CRUD sub-routes for artists (no standalone page — lives on `/admin/art`) |
+| `/images/:filename` | Serve uploaded image (blob or `public/images/`) |
+| `/admin` | Login page; `POST /admin/login` sets the signed role cookie + `snapshotBlobs()`, `POST /admin/logout` clears it |
+| `/admin/drinks`, `/admin/djs`, `/admin/art` | CRUD — list, add (`POST`), edit (`GET /edit/:id`), cancel (`GET /cancel/:id`), delete (`DELETE /:id`) |
+| `/admin/djs/bulk` | Bulk DJ import from a text list (`POST`) |
+| `/admin/site` | Hero image, tagline, hours, homepage content, backups list (htmx sub-routes `/remove-hero`, `/texts`, `/texts/footer`, `/home`) |
+| `/admin/backups` | List / `GET /:ts/download` / `POST /:ts/restore` data snapshots |
+| `/admin/artists` | Artists CRUD sub-routes (`POST`, `/edit/:id`, `/cancel/:id`, `DELETE /:id`) — no standalone page, lives on `/admin/art` |
 
 ## Auth roles
 - Three roles via separate passwords: `ADMIN_PASSWORD` → `master`, `DJ_PASSWORD` → `dj`, `ART_PASSWORD` → `art`
@@ -100,12 +104,20 @@ ADMIN_PASSWORD=yourpass node server.js
 - Don't commit `site.json` changes — inline backup/restore in tests that modify it
 
 ## Tests
-- Node built-in test runner: `npm test` — 48 tests across 8 suites
+- Node built-in test runner: `npm test` — 50 tests across 8 suites
 - `findRowId(html, prefix, name)` helper — finds an item's DOM id by scanning for the row id attribute before the name text
 - Inline backup/restore pattern: read file before POST, `fs.writeFileSync` after assertions — prevents test artifacts
 - Top-level `after` hook restores all data files as safety net
 - Login → extract cookie → pass to subsequent admin requests
 - htmx assertions: check for `Save`/`Cancel`/`Edit`/`Delete` buttons and `admin-row-edit` class on edit forms
+
+## Quality gate (no-mistakes)
+- Initialized with `no-mistakes init`: global daemon/config in `~/.no-mistakes`, plus a `no-mistakes` git remote pointing at a local bare repo. Nothing repo-local to commit; optional repo overrides go in `.no-mistakes.yaml` on `main` (trusted default-branch copy).
+- Validate **committed** work on a feature branch — never `main`: commit, then `no-mistakes axi run --intent "<what the user set out to accomplish>"`. Intent is the goal, not a diff summary.
+- While a run is active the pipeline owns fixes: at a `gate:` reply with `no-mistakes axi respond --action fix|approve`; never hand-edit findings, `abort`, or `rerun` mid-run. Relay `ask-user` findings to the user verbatim.
+- Inspect with `no-mistakes axi`, `axi status`, `axi logs --step <name> --full`. Check the structured `branch_sync` before any follow-up commit and run the reported `axi sync` / `axi sync --recover` instead of resetting or hand-rebasing.
+- `outcome: checks-passed` = PR green: hand it to the user to review and merge, don't poll for the merge. `passed-with-skips` means CI verification was unavailable.
+- This repo has no CI workflows, so runs end `passed-with-skips` unless `main` carries `no_ci: true` in `.no-mistakes.yaml` (or CI is added via `no-mistakes ci-workflow`).
 
 ## Changelog & issues
 - `CHANGELOG.md` follows Keep a Changelog + SemVer. Every **user-facing** change (feature, bug fix, behavior change) gets an entry under `## [Unreleased]` in the right category (`Added`/`Changed`/`Fixed`/`Removed`/`Security`). Skip internal-only commits (refactor, docs, chore, tests, formatting) and anything reverted before release.
@@ -124,4 +136,4 @@ The five canonical triage roles map to same-named labels (`needs-triage`, `needs
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
