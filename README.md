@@ -11,7 +11,7 @@ ADMIN_PASSWORD=yourpass node server.js
 
 Open `http://localhost:3000`.
 
-If `ADMIN_PASSWORD` is unset, local dev falls back to password `admin` (production never falls back — login is disabled until a password is set).
+If `ADMIN_PASSWORD` is unset, local dev falls back to password `admin`; production never falls back — the master role stays disabled until a password is set.
 
 Local admin changes write to tracked files in `data/` and `public/images/`, so you can review them with `git status`, commit, and push.
 
